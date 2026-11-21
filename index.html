@@ -72,7 +72,7 @@
     .sheet-box { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
     .sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
     .staff-svg { width: 100%; height: 128px; display: block; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
-    .notes-seq { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: .84rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+    .notes-seq { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: .84rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto; }
     @media (prefers-reduced-motion: reduce) { .chip, .btn { transition: none; } }
   </style>
 </head>
@@ -80,7 +80,7 @@
 <div class="app">
   <header>
     <h1>استوديو الأغاني</h1>
-    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنَّى بصوت وموسيقى كاملة مع النوتة.</p>
+    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنَّى أو تُعزف مع النوتة الموسيقية.</p>
   </header>
 
   <details class="card" id="setup">
@@ -102,6 +102,15 @@
         <label class="label" for="textModel">نموذج كتابة الكلمات</label>
         <input type="text" id="textModel" class="ltr" value="gemini-3.5-flash-lite">
       </div>
+    </div>
+    <div class="field">
+      <label class="label" for="localDuration">مدة العزف المحلي</label>
+      <select id="localDuration">
+        <option value="900000" selected>١٥ دقيقة (عزف مستمر)</option>
+        <option value="300000">٥ دقائق</option>
+        <option value="60000">دقيقة واحدة</option>
+        <option value="30000">٣٠ ثانية</option>
+      </select>
     </div>
     <div class="actions">
       <button class="btn btn-primary" id="saveKey" type="button">حفظ الإعدادات</button>
@@ -131,14 +140,14 @@
 
   <section class="card" id="lyricsCard" hidden>
     <h2>٣. الكلمات والأسلوب</h2>
-    <p class="sub">عدّل ما تشاء قبل الغناء. الوسوم بين الأقواس مثل [Verse 1] تحدد أقسام الأغنية.</p>
+    <p class="sub">عدّل ما تشاء قبل الغناء أو العزف. الوسوم بين الأقواس مثل [Verse 1] تحدد أقسام الأغنية.</p>
     <div class="field"><label class="label" for="title">العنوان</label><input type="text" id="title"></div>
     <div class="field"><label class="label" for="lyrics">الكلمات</label><textarea id="lyrics" class="lyrics"></textarea></div>
     <div class="field"><label class="label" for="style">وصف الموسيقى (بالإنجليزية)</label><textarea id="style" class="ltr"></textarea></div>
     <p class="note" id="songNote" hidden></p>
     <div class="actions">
       <button class="btn btn-primary" id="sing" type="button">غنِّ الأغنية</button>
-      <button class="btn" id="stop" type="button" hidden>إيقاف</button>
+      <button class="btn" id="stop" type="button" hidden>إيقاف وحفظ</button>
       <button class="btn" id="saveLyricsBtn" type="button">حفظ الكلمات والنوتة</button>
       <button class="btn" id="downloadLyricsBtn" type="button">تنزيل الكلمات</button>
       <span class="status" id="singStatus" role="status"></span>
@@ -231,11 +240,13 @@
   var savedSingModel = lsGet("ss.singModel", "lyria-3-clip-preview");
   $("#singModel").value = (savedSingModel === "lyria-3-pro-preview" || savedSingModel === "lyria-3-pro") ? "lyria-3-pro-preview" : "lyria-3-clip-preview";
   $("#textModel").value = lsGet("ss.textModel", "gemini-3.5-flash-lite") || "gemini-3.5-flash-lite";
+  $("#localDuration").value = lsGet("ss.localDuration", "900000") || "900000";
   if (!$("#key").value) $("#setup").open = true;
   $("#saveKey").addEventListener("click", function () {
     lsSet("ss.key", $("#key").value.trim());
     lsSet("ss.singModel", $("#singModel").value || "lyria-3-clip-preview");
     lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.5-flash-lite");
+    lsSet("ss.localDuration", $("#localDuration").value || "900000");
     $("#keyStatus").textContent = "تم الحفظ.";
     if ($("#key").value.trim()) $("#setup").open = false;
   });
@@ -675,35 +686,17 @@
     $("#write").disabled = false;
   });
 
-  /* Render WAV Blob from recorded instrumental notes so local arrangement can be saved & downloaded */
+  /* Render WAV Blob from recorded instrumental notes (11025Hz mono 16-bit for compact 15-min support) */
   function synthesizeNotesToWavBlob(notesArr, bpm) {
-    var sampleRate = 22050;
+    var sampleRate = 11025;
     var beatSec = Math.max(0.25, 60 / (bpm || 72));
     var list = notesArr && notesArr.length ? notesArr : [{ semi: 0, dur: "Quarter" }, { semi: 2, dur: "Quarter" }, { semi: 4, dur: "Quarter" }];
-    var totalSec = Math.max(2, list.length * beatSec + 0.4);
+    var totalSec = Math.max(2, list.length * beatSec + 0.3);
     var totalSamples = Math.floor(totalSec * sampleRate);
-    var pcm = new Float32Array(totalSamples);
-
-    list.forEach(function (n, i) {
-      var startSec = i * beatSec;
-      var durSec = beatSec * 0.92;
-      var startIdx = Math.floor(startSec * sampleRate);
-      var len = Math.min(totalSamples - startIdx, Math.floor(durSec * sampleRate));
-      var freq = 220 * Math.pow(2, (n.semi || 0) / 12);
-      var bassFreq = 110 * Math.pow(2, (n.semi || 0) / 12);
-
-      for (var s = 0; s < len; s++) {
-        var t = s / sampleRate;
-        var env = Math.min(1, t / 0.03) * Math.max(0, 1 - (t / durSec));
-        var lead = Math.sin(2 * Math.PI * freq * t) * 0.22;
-        var bass = (i % 2 === 0) ? (Math.sin(2 * Math.PI * bassFreq * t) * 0.14) : 0;
-        pcm[startIdx + s] += (lead + bass) * env;
-      }
-    });
-
     var bytesPerSample = 2;
     var buffer = new ArrayBuffer(44 + totalSamples * bytesPerSample);
     var view = new DataView(buffer);
+
     function writeStr(off, str) {
       for (var j = 0; j < str.length; j++) view.setUint8(off + j, str.charCodeAt(j));
     }
@@ -721,39 +714,107 @@
     writeStr(36, "data");
     view.setUint32(40, totalSamples * bytesPerSample, true);
 
-    var offset = 44;
-    for (var k = 0; k < totalSamples; k++) {
-      var clamped = Math.max(-1, Math.min(1, pcm[k]));
-      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF, true);
-      offset += 2;
+    var bassFreq = 110 * Math.pow(2, (list[0].semi || 0) / 12);
+    var noteIdx = 0;
+    var noteStartSample = 0;
+    var samplesPerBeat = Math.floor(beatSec * sampleRate);
+    var activeDurSamples = Math.floor(beatSec * 0.92 * sampleRate);
+
+    for (var s = 0; s < totalSamples; s++) {
+      var val = 0;
+      if (noteIdx < list.length) {
+        var localS = s - noteStartSample;
+        if (localS >= samplesPerBeat) {
+          noteIdx++;
+          noteStartSample = s;
+          localS = 0;
+        }
+        if (noteIdx < list.length && localS < activeDurSamples) {
+          var t = localS / sampleRate;
+          var durSec = activeDurSamples / sampleRate;
+          var env = Math.min(1, t / 0.03) * Math.max(0, 1 - (t / durSec));
+          var freq = 220 * Math.pow(2, (list[noteIdx].semi || 0) / 12);
+          var lead = Math.sin(2 * Math.PI * freq * t) * 0.22;
+          var bass = (noteIdx % 2 === 0) ? (Math.sin(2 * Math.PI * bassFreq * t) * 0.14) : 0;
+          val = (lead + bass) * env;
+        }
+      }
+      var clamped = Math.max(-1, Math.min(1, val));
+      view.setInt16(44 + s * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF, true);
     }
+
     return new Blob([buffer], { type: "audio/wav" });
   }
 
-  /* Instrumental Web Audio Fallback with Live Note Recording (No robotic speech reading) */
-  var fbCtx = null, fbTimer = null, fbStopTimeout = null;
+  /* Instrumental Web Audio Fallback (up to 15 minutes = 900000 ms) */
+  var fbCtx = null, fbTimer = null, fbStopTimeout = null, fbClockTimer = null, isFallbackPlaying = false;
   function stopFallbackAudio() {
+    isFallbackPlaying = false;
     if (fbTimer) { clearInterval(fbTimer); fbTimer = null; }
+    if (fbClockTimer) { clearInterval(fbClockTimer); fbClockTimer = null; }
     if (fbStopTimeout) { clearTimeout(fbStopTimeout); fbStopTimeout = null; }
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (_) {} }
     if (fbCtx) { fbCtx.close().catch(function () {}); fbCtx = null; }
   }
 
+  function formatMmSs(sec) {
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return (m < 10 ? "0" + m : String(m)) + ":" + (s < 10 ? "0" + s : String(s));
+  }
+
+  async function finalizeAndSaveFallback(styleStr) {
+    var info = parseStyleInfo(styleStr);
+    var titleVal = $("#title").value.trim() || "أغنية";
+    if (!recordedNotes.length) return;
+    var wavBlob = synthesizeNotesToWavBlob(recordedNotes, info.bpm);
+    showTake(wavBlob, titleVal + " (عزف محلي)");
+    var id = activeSongId || String(Date.now());
+    activeSongId = id;
+    await save({
+      id: id,
+      title: titleVal,
+      lyrics: $("#lyrics").value,
+      style: $("#style").value,
+      sheetText: lastSheetPlain,
+      sheetMeta: lastSheetMeta,
+      sheetNotes: lastSheetNotes.slice(),
+      blob: wavBlob,
+      created: Date.now()
+    });
+  }
+
   function startInstrumentalFallback(styleStr, onDone) {
     stopFallbackAudio();
+    isFallbackPlaying = true;
     recordedNotes = [];
     var info = parseStyleInfo(styleStr);
     var beatMs = Math.round((60 / info.bpm) * 1000);
+    var durationMs = parseInt($("#localDuration").value || lsGet("ss.localDuration", "900000"), 10) || 900000;
+    var totalSec = Math.round(durationMs / 1000);
+    var startTime = Date.now();
     var AC = window.AudioContext || window.webkitAudioContext;
 
     updateNotationUI("نوتة العزف اللحني المحلي (Web Audio — بدون قراءة صوتية آلية)", styleStr, []);
 
+    fbClockTimer = setInterval(function () {
+      var elapsed = Math.min(totalSec, Math.round((Date.now() - startTime) / 1000));
+      status("#singStatus", "جاري العزف اللحني المحلي (" + formatMmSs(elapsed) + " / " + formatMmSs(totalSec) + ") — اضغط إيقاف وحفظ في أي وقت.");
+    }, 1000);
+
     if (AC) {
       fbCtx = new AC();
-      var step = 0, pat = [0, 2, 4, 2, 3, 4, 2, 1];
+      var step = 0;
+      var phrases = [
+        [0, 2, 4, 2, 3, 4, 2, 1],
+        [0, 3, 5, 4, 3, 2, 1, 0],
+        [4, 5, 6, 5, 4, 3, 2, 1],
+        [2, 4, 3, 2, 1, 2, 0, 0]
+      ];
       fbTimer = setInterval(function () {
         if (!fbCtx || fbCtx.state === "closed") return;
-        var deg = pat[step % pat.length];
+        var phrase = phrases[Math.floor(step / 8) % phrases.length];
+        var deg = phrase[step % phrase.length];
         var semi = info.scale[deg % info.scale.length];
         var freq = 220 * Math.pow(2, semi / 12);
 
@@ -786,24 +847,9 @@
 
     fbStopTimeout = setTimeout(async function () {
       stopFallbackAudio();
-      var titleVal = $("#title").value.trim() || "أغنية";
-      var wavBlob = synthesizeNotesToWavBlob(recordedNotes, info.bpm);
-      showTake(wavBlob, titleVal + " (عزف محلي)");
-      var id = activeSongId || String(Date.now());
-      activeSongId = id;
-      await save({
-        id: id,
-        title: titleVal,
-        lyrics: $("#lyrics").value,
-        style: $("#style").value,
-        sheetText: lastSheetPlain,
-        sheetMeta: lastSheetMeta,
-        sheetNotes: lastSheetNotes.slice(),
-        blob: wavBlob,
-        created: Date.now()
-      });
+      await finalizeAndSaveFallback(styleStr);
       if (onDone) onDone();
-    }, 12000);
+    }, durationMs);
   }
 
   /* Step 4: Sing with Lyria */
@@ -849,13 +895,20 @@
   }
 
   var actl = null, timer = null;
-  $("#stop").addEventListener("click", function () {
+  $("#stop").addEventListener("click", async function () {
+    var wasPlayingFallback = isFallbackPlaying;
     stopFallbackAudio();
     if (actl) actl.abort();
     clearInterval(timer);
     $("#sing").disabled = false;
     $("#stop").hidden = true;
-    status("#singStatus", "تم الإيقاف.");
+    if (wasPlayingFallback && recordedNotes.length) {
+      status("#singStatus", "جاري حفظ العزف المسجّل...");
+      await finalizeAndSaveFallback($("#style").value);
+      status("#singStatus", "تم إيقاف العزف وحفظ المقطع الصوتي مع الكلمات والنوتة.");
+    } else {
+      status("#singStatus", "تم الإيقاف.");
+    }
   });
 
   $("#sing").addEventListener("click", async function () {
@@ -908,10 +961,9 @@
       var emsg = String((e && e.message) || e || "");
       var isFallbackEligible = (e && e.http === 404) || /not found|limit: 0|429|rate limit|quota/i.test(emsg);
       if (isFallbackEligible) {
-        status("#singStatus", "الغناء السحابي غير متاح حالياً على هذا المسار — تم تشغيل العزف اللحني المحلي والنوتة (وسيتم حفظه وتوفيره للتنزيل).");
         startInstrumentalFallback($("#style").value, function () {
           $("#sing").disabled = false; $("#stop").hidden = true;
-          status("#singStatus", "اكتمل العزف المحلي وتم حفظه مع الكلمات والنوتة.");
+          status("#singStatus", "اكتمل العزف المحلي (١٥ دقيقة) وتم حفظه مع الكلمات والنوتة.");
         });
         return;
       }
