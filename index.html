@@ -93,8 +93,8 @@
       <div class="field">
         <label class="label" for="singModel">نموذج الغناء</label>
         <select id="singModel">
-          <option value="lyria-3-clip">Lyria 3 Clip: ٣٠ ثانية للتجربة</option>
-          <option value="lyria-3-pro">Lyria 3 Pro: أغنية كاملة (دقيقتان)</option>
+          <option value="lyria-3-clip-preview">Lyria 3 Clip: ٣٠ ثانية للتجربة</option>
+          <option value="lyria-3-pro-preview">Lyria 3 Pro: أغنية كاملة (دقيقتان)</option>
         </select>
       </div>
       <div class="field">
@@ -223,13 +223,13 @@
 
   /* Settings */
   $("#key").value = lsGet("ss.key", "");
-  var savedSingModel = lsGet("ss.singModel", "lyria-3-clip");
-  $("#singModel").value = (savedSingModel === "lyria-3-pro") ? "lyria-3-pro" : "lyria-3-clip";
+  var savedSingModel = lsGet("ss.singModel", "lyria-3-clip-preview");
+  $("#singModel").value = (savedSingModel === "lyria-3-pro-preview" || savedSingModel === "lyria-3-pro") ? "lyria-3-pro-preview" : "lyria-3-clip-preview";
   $("#textModel").value = lsGet("ss.textModel", "gemini-3.5-flash-lite") || "gemini-3.5-flash-lite";
   if (!$("#key").value) $("#setup").open = true;
   $("#saveKey").addEventListener("click", function () {
     lsSet("ss.key", $("#key").value.trim());
-    lsSet("ss.singModel", $("#singModel").value || "lyria-3-clip");
+    lsSet("ss.singModel", $("#singModel").value || "lyria-3-clip-preview");
     lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.5-flash-lite");
     $("#keyStatus").textContent = "تم الحفظ.";
     if ($("#key").value.trim()) $("#setup").open = false;
@@ -636,7 +636,8 @@
 
   function singPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
-    var full = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip")) === "lyria-3-pro";
+    var curModel = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip-preview"));
+    var full = /pro/i.test(curModel);
     return [
       full ? "Create a full length song of about 2 minutes." : "Create a 30 second song clip.",
       "Style: " + $("#style").value.trim() + ".",
@@ -669,7 +670,7 @@
     timer = setInterval(function () { status("#singStatus", "جاري غناء الأغنية... " + Math.round((Date.now() - t0) / 1000) + "ث"); }, 1000);
     status("#singStatus", "جاري غناء الأغنية...");
     try {
-      var model = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip")).trim();
+      var model = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip-preview")).trim();
       var res = await callApi(API + "/v1beta/interactions", { model: model, input: singPrompt() }, key, actl.signal);
       var a = findAudio(res, 0);
       if (!a) {
@@ -687,10 +688,15 @@
       status("#singStatus", "تمت العملية. الأغنية محفوظة على جهازك.");
     } catch (e) {
       clearInterval(timer);
+      if (e && e.name === "AbortError") {
+        $("#sing").disabled = false; $("#stop").hidden = true;
+        status("#singStatus", "تم الإيقاف.");
+        return;
+      }
       var emsg = String((e && e.message) || e || "");
-      var isQuotaOrTier = emsg.indexOf("limit: 0") >= 0 || emsg.indexOf("429") >= 0 || emsg.toLowerCase().indexOf("rate limit") >= 0 || emsg.toLowerCase().indexOf("quota") >= 0;
-      if (isQuotaOrTier) {
-        status("#singStatus", "حد Lyria المجاني غير متاح حالياً — تم تشغيل المعاينة الموسيقية والصوتية المحلية.");
+      var isFallbackEligible = (e && e.http === 404) || /not found|limit: 0|429|rate limit|quota/i.test(emsg);
+      if (isFallbackEligible) {
+        status("#singStatus", "نموذج الغناء غير متاح حالياً على هذا المسار — تم تشغيل المعاينة الموسيقية والصوتية المحلية والنوتة.");
         startBrowserFallback($("#lyrics").value, $("#style").value, function () {
           $("#sing").disabled = false; $("#stop").hidden = true;
           status("#singStatus", "انتهت المعاينة المحلية.");
