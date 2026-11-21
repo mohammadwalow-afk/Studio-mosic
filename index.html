@@ -68,6 +68,10 @@
     .lib-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
     .lib-item h3 { font-family: var(--font-display); font-size: 1rem; }
     .meta { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); }
+    .sheet-box { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+    .sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+    .staff-svg { width: 100%; height: 128px; display: block; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+    .notes-seq { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: .84rem; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
     @media (prefers-reduced-motion: reduce) { .chip, .btn { transition: none; } }
   </style>
 </head>
@@ -137,6 +141,19 @@
       <span class="status" id="singStatus" role="status"></span>
     </div>
     <div class="take" id="take"></div>
+
+    <div class="sheet-box" id="sheetBox" hidden>
+      <div class="sheet-head">
+        <h3>النوتة الموسيقية للعازفين</h3>
+        <div class="actions">
+          <button class="btn btn-small" id="copyNotes" type="button">نسخ النوتة</button>
+          <span class="status" id="copyStatus"></span>
+        </div>
+      </div>
+      <p class="meta" id="sheetMeta"></p>
+      <svg class="staff-svg" id="staffSvg" viewBox="0 0 600 128" role="img" aria-label="مدرج النوتات الموسيقية"></svg>
+      <div class="notes-seq" id="notesSeq"></div>
+    </div>
   </section>
 
   <section class="card" id="libCard" hidden>
@@ -161,7 +178,7 @@
   var MAQAMS = ["اختر لي", "نهاوند", "حجاز", "راست", "بياتي", "كرد", "صبا", "سيكا"];
   var VOICES = ["نسائي", "رجالي", "ثنائي / كورال", "كورال"];
   var VOICE_EN = { "نسائي": "female", "رجالي": "male", "ثنائي / كورال": "male and female duet", "كورال": "choir" };
-  var MAQAM_EN = { "اختر لي": "", "نهاوند": "Maqam Nahawand", "حجاز": "Maqam Hijaz", "راست": "Maqam Rast", "بياتي": "Maqam Bayati", "كرد": "Maqam Kurd", "صبا": "Maqam Saba", "سيكا": "Maqam Sikah" };
+  var NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
   var state = { lang: "ar", genre: "هادئ وأكوستيك", mood: "شاعري حالم" };
 
   var $ = function (s) { return document.querySelector(s); };
@@ -182,7 +199,7 @@
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (c) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (c) {} }
 
-  function chipGroup(id, items, key, dflt) {
+  function chipGroup(id, items, key) {
     var box = $(id);
     items.forEach(function (it) {
       var val = it && it.id ? it.id : it, label = it && it.label ? it.label : it;
@@ -197,9 +214,9 @@
   }
 
   function fillSelect(id, items) { items.forEach(function (t) { $(id).appendChild(h("option", { value: t, text: t })); }); }
-  chipGroup("#langChips", LANGS, "lang", "ar");
-  chipGroup("#genreChips", GENRES, "genre", GENRES[0]);
-  chipGroup("#moodChips", MOODS, "mood", MOODS[0]);
+  chipGroup("#langChips", LANGS, "lang");
+  chipGroup("#genreChips", GENRES, "genre");
+  chipGroup("#moodChips", MOODS, "mood");
   fillSelect("#dialect", DIALECTS);
   fillSelect("#maqam", MAQAMS);
   fillSelect("#voice", VOICES);
@@ -257,10 +274,145 @@
     return "حدث خطأ: " + m;
   }
 
+  /* Music Notation Engine (Live Web Audio log + Suggested arrangement sheet) */
+  var recordedNotes = [];
+  var lastSheetPlain = "";
+
+  function semitoneToNoteName(semitoneFromA3) {
+    // A3 is MIDI 57
+    var midi = 57 + Math.round(semitoneFromA3);
+    var idx = ((midi % 12) + 12) % 12;
+    var octave = Math.floor(midi / 12) - 1;
+    return NOTE_NAMES[idx] + octave;
+  }
+
+  function parseStyleInfo(styleStr) {
+    var s = String(styleStr || "");
+    var m = s.match(/(\d{2,3})\s*bpm/i);
+    var bpm = m ? Math.min(Math.max(parseInt(m[1], 10), 55), 150) : 72;
+    var low = s.toLowerCase();
+    var scale = [0, 2, 3, 5, 7, 8, 10]; // Nahawand-like minor
+    var scaleLabel = "نهاوند (Nahawand)";
+    if (low.indexOf("hijaz") >= 0) { scale = [0, 1, 4, 5, 7, 8, 11]; scaleLabel = "حجاز (Hijaz)"; }
+    else if (low.indexOf("kurd") >= 0) { scale = [0, 1, 3, 5, 7, 8, 10]; scaleLabel = "كرد (Kurd)"; }
+    else if (low.indexOf("rast") >= 0 || low.indexOf("major") >= 0) { scale = [0, 2, 4, 5, 7, 9, 11]; scaleLabel = "راست / كبير (Rast)"; }
+    else if (low.indexOf("bayati") >= 0) { scale = [0, 2, 3, 5, 7, 8, 10]; scaleLabel = "بياتي (Bayati)"; }
+    return { bpm: bpm, scale: scale, scaleLabel: scaleLabel };
+  }
+
+  function renderStaff(notesArr) {
+    var svg = $("#staffSvg");
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var ns = "http://www.w3.org/2000/svg";
+    function el(tag, attrs) {
+      var node = document.createElementNS(ns, tag);
+      for (var k in attrs) node.setAttribute(k, attrs[k]);
+      return node;
+    }
+
+    // 5 staff lines
+    var topY = 34, gap = 11;
+    for (var i = 0; i < 5; i++) {
+      var y = topY + i * gap;
+      svg.appendChild(el("line", { x1: 24, y1: y, x2: 576, y2: y, stroke: "#6b645b", "stroke-width": "1.2" }));
+    }
+
+    // Clef indicator
+    var clef = el("text", { x: 32, y: topY + 34, fill: "#d98a1c", "font-size": "24", "font-family": "serif" });
+    clef.textContent = "𝄞";
+    svg.appendChild(clef);
+
+    var visible = notesArr.slice(-16);
+    if (!visible.length) {
+      var emptyTxt = el("text", { x: 300, y: 68, fill: "#9e968b", "font-size": "13", "text-anchor": "middle", "font-family": "sans-serif" });
+      emptyTxt.textContent = "ستظهر النوتات على المدرج عند تشغيل اللحن أو توليد الأغنية";
+      svg.appendChild(emptyTxt);
+      return;
+    }
+
+    var startX = 82, spanX = 470;
+    var stepX = visible.length > 1 ? spanX / Math.max(visible.length - 1, 1) : 0;
+
+    visible.forEach(function (n, idx) {
+      var x = visible.length === 1 ? 300 : Math.round(startX + idx * stepX);
+      var clampedSemi = Math.max(-7, Math.min(14, n.semi || 0));
+      // Map semitones onto staff vertical position
+      var y = Math.round(topY + 44 - clampedSemi * 3.2);
+      var isLast = idx === visible.length - 1;
+
+      // Stem
+      svg.appendChild(el("line", {
+        x1: x + 6, y1: y, x2: x + 6, y2: y - 24,
+        stroke: isLast ? "#d98a1c" : "#efeae2", "stroke-width": "1.4"
+      }));
+
+      // Note head
+      svg.appendChild(el("ellipse", {
+        cx: x, cy: y, rx: "6.5", ry: "4.6",
+        fill: isLast ? "#d98a1c" : "#efeae2"
+      }));
+
+      // Label below
+      var lbl = el("text", {
+        x: x, y: 115, fill: isLast ? "#d98a1c" : "#9e968b",
+        "font-size": "10.5", "text-anchor": "middle", "font-family": "monospace"
+      });
+      lbl.textContent = n.note;
+      svg.appendChild(lbl);
+    });
+  }
+
+  function updateNotationUI(modeLabel, styleStr, notesArr) {
+    var info = parseStyleInfo(styleStr);
+    $("#sheetBox").hidden = false;
+    $("#sheetMeta").textContent = modeLabel + " | المقام: " + info.scaleLabel + " | السرعة: " + info.bpm + " BPM | النغمة الأساس: A3";
+
+    var seqText = notesArr.map(function (item) {
+      return item.note + (item.dur ? "(" + item.dur + ")" : "");
+    }).join(" - ");
+
+    $("#notesSeq").textContent = seqText || "لا توجد نوتات مسجلة بعد.";
+    lastSheetPlain = [
+      "العنوان: " + ($("#title").value.trim() || "أغنية"),
+      modeLabel,
+      "المقام: " + info.scaleLabel + " | السرعة: " + info.bpm + " BPM",
+      "النوتات: " + seqText
+    ].join("\n");
+
+    renderStaff(notesArr);
+  }
+
+  function buildSuggestedArrangement(styleStr, lyricsStr) {
+    var info = parseStyleInfo(styleStr);
+    var linesCount = Math.max(4, String(lyricsStr || "").split(/\n+/).filter(function (l) { return l.trim() && !/^\s*\[.*\]\s*$/.test(l); }).length);
+    var totalBars = Math.min(24, Math.max(8, linesCount * 2));
+    var list = [];
+    var pat = [0, 2, 4, 5, 4, 2, 3, 1];
+    for (var i = 0; i < totalBars; i++) {
+      var deg = pat[i % pat.length];
+      var semi = info.scale[deg % info.scale.length] + (i >= 8 ? 2 : 0);
+      list.push({ note: semitoneToNoteName(semi), semi: semi, dur: (i % 4 === 3) ? "Half" : "Quarter" });
+    }
+    return list;
+  }
+
+  $("#copyNotes").addEventListener("click", function () {
+    if (!lastSheetPlain) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastSheetPlain).then(function () {
+        $("#copyStatus").textContent = "تم نسخ النوتة.";
+      }).catch(function () {
+        $("#copyStatus").textContent = "تعذر النسخ تلقائياً.";
+      });
+    }
+  });
+
   /* Step 2: write lyrics */
   function textPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
-    var req = $("#idea").value.trim();
+    var req = $("#maqam").value;
     return [
       "You are a songwriter and music arranger. Write an ORIGINAL song from the brief below.",
       "All lyrics must be in " + lang.prompt + (state.lang === "ar" ? ", dialect: " + $("#dialect").value : "") + ".",
@@ -315,7 +467,7 @@
     }
   });
 
-  /* Browser Fallback (Web Audio + SpeechSynthesis) */
+  /* Browser Fallback (Web Audio + SpeechSynthesis) with Live Note Recording */
   var fbCtx = null, fbTimer = null;
   function stopFallbackAudio() {
     if (fbTimer) { clearInterval(fbTimer); fbTimer = null; }
@@ -323,23 +475,15 @@
     if (fbCtx) { fbCtx.close().catch(function () {}); fbCtx = null; }
   }
 
-  function parseStyleInfo(styleStr) {
-    var s = String(styleStr || "");
-    var m = s.match(/(\d{2,3})\s*bpm/i);
-    var bpm = m ? Math.min(Math.max(parseInt(m[1], 10), 55), 150) : 72;
-    var low = s.toLowerCase();
-    var scale = [0, 2, 3, 5, 7, 8, 10];
-    if (low.indexOf("hijaz") >= 0) scale = [0, 1, 4, 5, 7, 8, 11];
-    else if (low.indexOf("kurd") >= 0) scale = [0, 1, 3, 5, 7, 8, 10];
-    else if (low.indexOf("rast") >= 0 || low.indexOf("major") >= 0) scale = [0, 2, 4, 5, 7, 9, 11];
-    return { bpm: bpm, scale: scale };
-  }
-
   function startBrowserFallback(lyricsStr, styleStr, onDone) {
     stopFallbackAudio();
+    recordedNotes = [];
     var info = parseStyleInfo(styleStr);
     var beatMs = Math.round((60 / info.bpm) * 1000);
     var AC = window.AudioContext || window.webkitAudioContext;
+
+    updateNotationUI("نوتة مطابقة للّحن المحلي المباشر (Web Audio)", styleStr, []);
+
     if (AC) {
       fbCtx = new AC();
       var step = 0, pat = [0, 2, 4, 2, 3, 4, 2, 1];
@@ -356,9 +500,13 @@
         g.gain.exponentialRampToValueAtTime(0.0001, fbCtx.currentTime + (beatMs / 1000) * 0.9);
         osc.connect(g); g.connect(fbCtx.destination);
         osc.start(); osc.stop(fbCtx.currentTime + (beatMs / 1000) * 0.92);
+
+        recordedNotes.push({ note: semitoneToNoteName(semi), semi: semi, dur: "Quarter" });
+        updateNotationUI("نوتة مطابقة للّحن المحلي المباشر (Web Audio)", styleStr, recordedNotes);
         step++;
       }, beatMs);
     }
+
     var spoken = String(lyricsStr || "").replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
     if ("speechSynthesis" in window && spoken) {
       var u = new SpeechSynthesisUtterance(spoken);
@@ -444,6 +592,8 @@
       var mime = /^audio\//i.test(a.mime) ? a.mime : (a.data.slice(0, 3) === "Ukl" ? "audio/wav" : "audio/mpeg");
       var blob = b64ToBlob(a.data, mime);
       showTake(blob, $("#title").value.trim() || "أغنية");
+      var suggested = buildSuggestedArrangement($("#style").value, $("#lyrics").value);
+      updateNotationUI("نوتة توزيع ومرافقة مقترحة (ليست تفريغاً صوتياً حرفياً لتسجيل Lyria)", $("#style").value, suggested);
       await save({ id: String(Date.now()), title: $("#title").value.trim() || "أغنية", lyrics: $("#lyrics").value, style: $("#style").value, blob: blob, created: Date.now() });
       clearInterval(timer);
       $("#sing").disabled = false; $("#stop").hidden = true;
