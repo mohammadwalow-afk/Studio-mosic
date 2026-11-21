@@ -54,7 +54,7 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); }
+    .btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
     .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
     .btn-small { padding: 6px 12px; font-size: .85rem; }
     .btn:disabled { opacity: .5; cursor: default; }
@@ -68,6 +68,7 @@
     .lib-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
     .lib-item h3 { font-family: var(--font-display); font-size: 1rem; }
     .meta { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); }
+    .badge { display: inline-block; font-size: .78rem; padding: 2px 8px; border-radius: 999px; background: var(--surface2); color: var(--muted); border: 1px solid var(--line); }
     .sheet-box { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
     .sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
     .staff-svg { width: 100%; height: 128px; display: block; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
@@ -79,7 +80,7 @@
 <div class="app">
   <header>
     <h1>استوديو الأغاني</h1>
-    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنَّى بصوت وموسيقى كاملة.</p>
+    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنَّى بصوت وموسيقى كاملة مع النوتة.</p>
   </header>
 
   <details class="card" id="setup">
@@ -138,6 +139,8 @@
     <div class="actions">
       <button class="btn btn-primary" id="sing" type="button">غنِّ الأغنية</button>
       <button class="btn" id="stop" type="button" hidden>إيقاف</button>
+      <button class="btn" id="saveLyricsBtn" type="button">حفظ الكلمات والنوتة</button>
+      <button class="btn" id="downloadLyricsBtn" type="button">تنزيل الكلمات</button>
       <span class="status" id="singStatus" role="status"></span>
     </div>
     <div class="take" id="take"></div>
@@ -147,6 +150,7 @@
         <h3>النوتة الموسيقية للعازفين</h3>
         <div class="actions">
           <button class="btn btn-small" id="copyNotes" type="button">نسخ النوتة</button>
+          <button class="btn btn-small" id="downloadNotesBtn" type="button">تنزيل النوتة</button>
           <span class="status" id="copyStatus"></span>
         </div>
       </div>
@@ -157,7 +161,7 @@
   </section>
 
   <section class="card" id="libCard" hidden>
-    <h2>أغانيك المحفوظة</h2>
+    <h2>أغانيك وكلماتك المحفوظة</h2>
     <div id="lib" class="lib" style="display:flex;flex-direction:column;gap:10px"></div>
   </section>
 </div>
@@ -180,6 +184,7 @@
   var VOICE_EN = { "نسائي": "female", "رجالي": "male", "ثنائي / كورال": "male and female duet", "كورال": "choir" };
   var NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
   var state = { lang: "ar", genre: "هادئ وأكوستيك", mood: "شاعري حالم" };
+  var activeSongId = "";
 
   var $ = function (s) { return document.querySelector(s); };
   function h(tag, attrs, kids) {
@@ -275,9 +280,29 @@
     return "حدث خطأ: " + m;
   }
 
+  function safeFileBase(title) {
+    return String(title || "song").replace(/[^\w\u0600-\u06FF-]+/g, "_").trim() || "song";
+  }
+
+  function triggerDownload(blobOrText, filename, mimeType) {
+    var blob = (blobOrText instanceof Blob) ? blobOrText : new Blob([String(blobOrText || "")], { type: mimeType || "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
+
   /* Music Notation Engine */
   var recordedNotes = [];
   var lastSheetPlain = "";
+  var lastSheetMeta = "";
+  var lastSheetNotes = [];
 
   function semitoneToNoteName(semitoneFromA3) {
     var midi = 57 + Math.round(semitoneFromA3);
@@ -325,7 +350,7 @@
     var visible = notesArr.slice(-16);
     if (!visible.length) {
       var emptyTxt = el("text", { x: 300, y: 68, fill: "#9e968b", "font-size": "13", "text-anchor": "middle", "font-family": "sans-serif" });
-      emptyTxt.textContent = "ستظهر النوتات على المدرج عند تشغيل اللحن أو توليد الأغنية";
+      emptyTxt.textContent = "ستظهر النوتات على المدرج عند تشغيل العزف أو توليد الأغنية";
       svg.appendChild(emptyTxt);
       return;
     }
@@ -360,10 +385,13 @@
 
   function updateNotationUI(modeLabel, styleStr, notesArr) {
     var info = parseStyleInfo(styleStr);
-    $("#sheetBox").hidden = false;
-    $("#sheetMeta").textContent = modeLabel + " | المقام: " + info.scaleLabel + " | السرعة: " + info.bpm + " BPM | النغمة الأساس: A3";
+    lastSheetNotes = Array.isArray(notesArr) ? notesArr.slice() : [];
+    lastSheetMeta = modeLabel + " | المقام: " + info.scaleLabel + " | السرعة: " + info.bpm + " BPM | النغمة الأساس: A3";
 
-    var seqText = notesArr.map(function (item) {
+    $("#sheetBox").hidden = false;
+    $("#sheetMeta").textContent = lastSheetMeta;
+
+    var seqText = lastSheetNotes.map(function (item) {
       return item.note + (item.dur ? "(" + item.dur + ")" : "");
     }).join(" - ");
 
@@ -375,7 +403,25 @@
       "النوتات: " + seqText
     ].join("\n");
 
-    renderStaff(notesArr);
+    renderStaff(lastSheetNotes);
+  }
+
+  function restoreSavedNotation(item) {
+    if (!item || (!item.sheetText && (!item.sheetNotes || !item.sheetNotes.length))) {
+      $("#sheetBox").hidden = true;
+      lastSheetPlain = "";
+      lastSheetMeta = "";
+      lastSheetNotes = [];
+      return;
+    }
+    lastSheetNotes = Array.isArray(item.sheetNotes) ? item.sheetNotes.slice() : [];
+    lastSheetMeta = item.sheetMeta || "نوتة محفوظة مع الكلمات";
+    lastSheetPlain = item.sheetText || $("#notesSeq").textContent || "";
+
+    $("#sheetBox").hidden = false;
+    $("#sheetMeta").textContent = lastSheetMeta;
+    $("#notesSeq").textContent = lastSheetPlain;
+    renderStaff(lastSheetNotes);
   }
 
   function buildSuggestedArrangement(styleStr, lyricsStr) {
@@ -392,15 +438,89 @@
     return list;
   }
 
+  function ensureCurrentSheetReady() {
+    if (!lastSheetPlain && !$("#sheetBox").hidden && $("#notesSeq").textContent.trim()) {
+      var info = parseStyleInfo($("#style").value);
+      lastSheetPlain = [
+        "العنوان: " + ($("#title").value.trim() || "أغنية"),
+        lastSheetMeta || "نوتة موسيقية",
+        "المقام: " + info.scaleLabel + " | السرعة: " + info.bpm + " BPM",
+        "النوتات: " + $("#notesSeq").textContent.trim()
+      ].join("\n");
+    }
+    return lastSheetPlain;
+  }
+
   $("#copyNotes").addEventListener("click", function () {
-    if (!lastSheetPlain) return;
+    var txt = ensureCurrentSheetReady();
+    if (!txt) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(lastSheetPlain).then(function () {
+      navigator.clipboard.writeText(txt).then(function () {
         $("#copyStatus").textContent = "تم نسخ النوتة.";
       }).catch(function () {
         $("#copyStatus").textContent = "تعذر النسخ تلقائياً.";
       });
     }
+  });
+
+  $("#downloadNotesBtn").addEventListener("click", function () {
+    var txt = ensureCurrentSheetReady();
+    if (!txt) {
+      $("#copyStatus").textContent = "لا توجد نوتة لتنزيلها بعد.";
+      return;
+    }
+    triggerDownload(txt, safeFileBase($("#title").value.trim() || "song") + "_notation.txt", "text/plain;charset=utf-8");
+    $("#copyStatus").textContent = "تم تنزيل النوتة.";
+  });
+
+  /* Save & Download Lyrics + Notation */
+  $("#saveLyricsBtn").addEventListener("click", async function () {
+    var titleVal = $("#title").value.trim() || "أغنية بدون عنوان";
+    var lyricsVal = $("#lyrics").value.trim();
+    var styleVal = $("#style").value.trim();
+    if (!lyricsVal) {
+      status("#singStatus", "لا توجد كلمات لحفظها بعد.", true);
+      return;
+    }
+    var existing = activeSongId ? await getSongById(activeSongId) : null;
+    var id = activeSongId || String(Date.now());
+    activeSongId = id;
+
+    var sheetTextToSave = ensureCurrentSheetReady() || (existing && existing.sheetText) || "";
+    var sheetMetaToSave = lastSheetMeta || (existing && existing.sheetMeta) || "";
+    var sheetNotesToSave = (lastSheetNotes && lastSheetNotes.length) ? lastSheetNotes.slice() : (existing && existing.sheetNotes) || [];
+
+    await save({
+      id: id,
+      title: titleVal,
+      lyrics: lyricsVal,
+      style: styleVal,
+      sheetText: sheetTextToSave,
+      sheetMeta: sheetMetaToSave,
+      sheetNotes: sheetNotesToSave,
+      blob: existing && existing.blob ? existing.blob : null,
+      created: existing && existing.created ? existing.created : Date.now()
+    });
+    status("#singStatus", sheetTextToSave ? "تم حفظ الكلمات والنوتة معاً في مكتبتك المحلية." : "تم حفظ الكلمات في مكتبتك المحلية.");
+  });
+
+  $("#downloadLyricsBtn").addEventListener("click", function () {
+    var titleVal = $("#title").value.trim() || "أغنية";
+    var lyricsVal = $("#lyrics").value.trim();
+    var styleVal = $("#style").value.trim();
+    var sheetTxt = ensureCurrentSheetReady();
+    if (!lyricsVal && !sheetTxt) {
+      status("#singStatus", "لا توجد كلمات أو نوتة لتنزيلها بعد.", true);
+      return;
+    }
+    var content = [
+      "العنوان: " + titleVal,
+      styleVal ? "وصف الموسيقى: " + styleVal : "",
+      lyricsVal ? "----------------------------------------\nالكلمات:\n" + lyricsVal : "",
+      sheetTxt ? "----------------------------------------\nالنوتة الموسيقية:\n" + sheetTxt : ""
+    ].filter(Boolean).join("\n\n");
+    triggerDownload(content, safeFileBase(titleVal) + "_lyrics_and_notes.txt", "text/plain;charset=utf-8");
+    status("#singStatus", "تم تنزيل ملف الكلمات والنوتة.");
   });
 
   /* Local Instant Draft Fallback when models are busy or unavailable */
@@ -472,6 +592,7 @@
   }
 
   function applyLyricsResult(titleVal, lyricsVal, styleVal, noteVal) {
+    activeSongId = "";
     $("#title").value = titleVal || "أغنية جديدة";
     $("#lyrics").value = lyricsVal || "";
     $("#style").value = styleVal || (state.genre + " " + state.mood + " song");
@@ -523,7 +644,7 @@
           }).join("\n\n");
 
           applyLyricsResult(d.title, formattedLyrics, d.music_prompt, d.note);
-          status("#writeStatus", "تمت كتابة الكلمات عبر " + model + ". راجعها ثم اضغط غنِّ الأغنية.");
+          status("#writeStatus", "تمت كتابة الكلمات عبر " + model + ". راجعها ثم اضغط غنِّ الأغنية أو احفظ الكلمات.");
           succeeded = true;
           break;
         } catch (e) {
@@ -554,22 +675,78 @@
     $("#write").disabled = false;
   });
 
-  /* Browser Fallback (Web Audio + SpeechSynthesis) with Live Note Recording */
-  var fbCtx = null, fbTimer = null;
+  /* Render WAV Blob from recorded instrumental notes so local arrangement can be saved & downloaded */
+  function synthesizeNotesToWavBlob(notesArr, bpm) {
+    var sampleRate = 22050;
+    var beatSec = Math.max(0.25, 60 / (bpm || 72));
+    var list = notesArr && notesArr.length ? notesArr : [{ semi: 0, dur: "Quarter" }, { semi: 2, dur: "Quarter" }, { semi: 4, dur: "Quarter" }];
+    var totalSec = Math.max(2, list.length * beatSec + 0.4);
+    var totalSamples = Math.floor(totalSec * sampleRate);
+    var pcm = new Float32Array(totalSamples);
+
+    list.forEach(function (n, i) {
+      var startSec = i * beatSec;
+      var durSec = beatSec * 0.92;
+      var startIdx = Math.floor(startSec * sampleRate);
+      var len = Math.min(totalSamples - startIdx, Math.floor(durSec * sampleRate));
+      var freq = 220 * Math.pow(2, (n.semi || 0) / 12);
+      var bassFreq = 110 * Math.pow(2, (n.semi || 0) / 12);
+
+      for (var s = 0; s < len; s++) {
+        var t = s / sampleRate;
+        var env = Math.min(1, t / 0.03) * Math.max(0, 1 - (t / durSec));
+        var lead = Math.sin(2 * Math.PI * freq * t) * 0.22;
+        var bass = (i % 2 === 0) ? (Math.sin(2 * Math.PI * bassFreq * t) * 0.14) : 0;
+        pcm[startIdx + s] += (lead + bass) * env;
+      }
+    });
+
+    var bytesPerSample = 2;
+    var buffer = new ArrayBuffer(44 + totalSamples * bytesPerSample);
+    var view = new DataView(buffer);
+    function writeStr(off, str) {
+      for (var j = 0; j < str.length; j++) view.setUint8(off + j, str.charCodeAt(j));
+    }
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + totalSamples * bytesPerSample, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * bytesPerSample, true);
+    view.setUint16(32, bytesPerSample, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, totalSamples * bytesPerSample, true);
+
+    var offset = 44;
+    for (var k = 0; k < totalSamples; k++) {
+      var clamped = Math.max(-1, Math.min(1, pcm[k]));
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF, true);
+      offset += 2;
+    }
+    return new Blob([buffer], { type: "audio/wav" });
+  }
+
+  /* Instrumental Web Audio Fallback with Live Note Recording (No robotic speech reading) */
+  var fbCtx = null, fbTimer = null, fbStopTimeout = null;
   function stopFallbackAudio() {
     if (fbTimer) { clearInterval(fbTimer); fbTimer = null; }
+    if (fbStopTimeout) { clearTimeout(fbStopTimeout); fbStopTimeout = null; }
     if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (_) {} }
     if (fbCtx) { fbCtx.close().catch(function () {}); fbCtx = null; }
   }
 
-  function startBrowserFallback(lyricsStr, styleStr, onDone) {
+  function startInstrumentalFallback(styleStr, onDone) {
     stopFallbackAudio();
     recordedNotes = [];
     var info = parseStyleInfo(styleStr);
     var beatMs = Math.round((60 / info.bpm) * 1000);
     var AC = window.AudioContext || window.webkitAudioContext;
 
-    updateNotationUI("نوتة مطابقة للّحن المحلي المباشر (Web Audio)", styleStr, []);
+    updateNotationUI("نوتة العزف اللحني المحلي (Web Audio — بدون قراءة صوتية آلية)", styleStr, []);
 
     if (AC) {
       fbCtx = new AC();
@@ -579,32 +756,54 @@
         var deg = pat[step % pat.length];
         var semi = info.scale[deg % info.scale.length];
         var freq = 220 * Math.pow(2, semi / 12);
+
         var osc = fbCtx.createOscillator(), g = fbCtx.createGain();
         osc.type = "triangle";
         osc.frequency.setValueAtTime(freq, fbCtx.currentTime);
         g.gain.setValueAtTime(0.0001, fbCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.07, fbCtx.currentTime + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.075, fbCtx.currentTime + 0.035);
         g.gain.exponentialRampToValueAtTime(0.0001, fbCtx.currentTime + (beatMs / 1000) * 0.9);
         osc.connect(g); g.connect(fbCtx.destination);
         osc.start(); osc.stop(fbCtx.currentTime + (beatMs / 1000) * 0.92);
 
+        if (step % 2 === 0) {
+          var bassOsc = fbCtx.createOscillator(), bassGain = fbCtx.createGain();
+          var bassFreq = 110 * Math.pow(2, info.scale[0] / 12);
+          bassOsc.type = "sine";
+          bassOsc.frequency.setValueAtTime(bassFreq, fbCtx.currentTime);
+          bassGain.gain.setValueAtTime(0.0001, fbCtx.currentTime);
+          bassGain.gain.exponentialRampToValueAtTime(0.05, fbCtx.currentTime + 0.05);
+          bassGain.gain.exponentialRampToValueAtTime(0.0001, fbCtx.currentTime + (beatMs / 1000) * 1.85);
+          bassOsc.connect(bassGain); bassGain.connect(fbCtx.destination);
+          bassOsc.start(); bassOsc.stop(fbCtx.currentTime + (beatMs / 1000) * 1.9);
+        }
+
         recordedNotes.push({ note: semitoneToNoteName(semi), semi: semi, dur: "Quarter" });
-        updateNotationUI("نوتة مطابقة للّحن المحلي المباشر (Web Audio)", styleStr, recordedNotes);
+        updateNotationUI("نوتة العزف اللحني المحلي (Web Audio — بدون قراءة صوتية آلية)", styleStr, recordedNotes);
         step++;
       }, beatMs);
     }
 
-    var spoken = String(lyricsStr || "").replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
-    if ("speechSynthesis" in window && spoken) {
-      var u = new SpeechSynthesisUtterance(spoken);
-      u.lang = (state.lang === "en") ? "en-US" : ((state.lang === "ckb" || state.lang === "kmr") ? "ar-IQ" : "ar-SA");
-      u.rate = 0.88;
-      u.onend = function () { stopFallbackAudio(); if (onDone) onDone(); };
-      u.onerror = function () { stopFallbackAudio(); if (onDone) onDone(); };
-      window.speechSynthesis.speak(u);
-    } else if (onDone) {
-      setTimeout(function () { stopFallbackAudio(); onDone(); }, 15000);
-    }
+    fbStopTimeout = setTimeout(async function () {
+      stopFallbackAudio();
+      var titleVal = $("#title").value.trim() || "أغنية";
+      var wavBlob = synthesizeNotesToWavBlob(recordedNotes, info.bpm);
+      showTake(wavBlob, titleVal + " (عزف محلي)");
+      var id = activeSongId || String(Date.now());
+      activeSongId = id;
+      await save({
+        id: id,
+        title: titleVal,
+        lyrics: $("#lyrics").value,
+        style: $("#style").value,
+        sheetText: lastSheetPlain,
+        sheetMeta: lastSheetMeta,
+        sheetNotes: lastSheetNotes.slice(),
+        blob: wavBlob,
+        created: Date.now()
+      });
+      if (onDone) onDone();
+    }, 12000);
   }
 
   /* Step 4: Sing with Lyria */
@@ -679,13 +878,26 @@
       }
       var mime = /^audio\//i.test(a.mime) ? a.mime : (a.data.slice(0, 3) === "Ukl" ? "audio/wav" : "audio/mpeg");
       var blob = b64ToBlob(a.data, mime);
-      showTake(blob, $("#title").value.trim() || "أغنية");
+      var titleVal = $("#title").value.trim() || "أغنية";
+      showTake(blob, titleVal);
       var suggested = buildSuggestedArrangement($("#style").value, $("#lyrics").value);
       updateNotationUI("نوتة توزيع ومرافقة مقترحة (ليست تفريغاً صوتياً حرفياً لتسجيل Lyria)", $("#style").value, suggested);
-      await save({ id: String(Date.now()), title: $("#title").value.trim() || "أغنية", lyrics: $("#lyrics").value, style: $("#style").value, blob: blob, created: Date.now() });
+      var id = activeSongId || String(Date.now());
+      activeSongId = id;
+      await save({
+        id: id,
+        title: titleVal,
+        lyrics: $("#lyrics").value,
+        style: $("#style").value,
+        sheetText: lastSheetPlain,
+        sheetMeta: lastSheetMeta,
+        sheetNotes: lastSheetNotes.slice(),
+        blob: blob,
+        created: Date.now()
+      });
       clearInterval(timer);
       $("#sing").disabled = false; $("#stop").hidden = true;
-      status("#singStatus", "تمت العملية. الأغنية محفوظة على جهازك.");
+      status("#singStatus", "تمت العملية. الأغنية والكلمات والنوتة محفوظة على جهازك.");
     } catch (e) {
       clearInterval(timer);
       if (e && e.name === "AbortError") {
@@ -696,10 +908,10 @@
       var emsg = String((e && e.message) || e || "");
       var isFallbackEligible = (e && e.http === 404) || /not found|limit: 0|429|rate limit|quota/i.test(emsg);
       if (isFallbackEligible) {
-        status("#singStatus", "نموذج الغناء غير متاح حالياً على هذا المسار — تم تشغيل المعاينة الموسيقية والصوتية المحلية والنوتة.");
-        startBrowserFallback($("#lyrics").value, $("#style").value, function () {
+        status("#singStatus", "الغناء السحابي غير متاح حالياً على هذا المسار — تم تشغيل العزف اللحني المحلي والنوتة (وسيتم حفظه وتوفيره للتنزيل).");
+        startInstrumentalFallback($("#style").value, function () {
           $("#sing").disabled = false; $("#stop").hidden = true;
-          status("#singStatus", "انتهت المعاينة المحلية.");
+          status("#singStatus", "اكتمل العزف المحلي وتم حفظه مع الكلمات والنوتة.");
         });
         return;
       }
@@ -711,10 +923,10 @@
   function extOf(blob) { return /wav/i.test(blob.type) ? "wav" : "mp3"; }
   function playerFor(blob, title) {
     var url = URL.createObjectURL(blob);
-    var name = title.replace(/[^\w\u0600-\u06FF-]+/g, "_").trim() || "song";
+    var name = safeFileBase(title);
     return [
       h("audio", { controls: "", src: url }),
-      h("div", { class: "actions" }, h("a", { class: "btn btn-small", href: url, download: name + "." + extOf(blob), text: "تحميل" }))
+      h("div", { class: "actions" }, h("a", { class: "btn btn-small btn-primary", href: url, download: name + "." + extOf(blob), text: "تنزيل الأغنية" }))
     ];
   }
 
@@ -746,23 +958,62 @@
     });
   }
 
+  function getSongById(id) {
+    return tx("readonly", function (s) { return s.get(id); }).catch(function () { return null; });
+  }
+
   function save(song) { return tx("readwrite", function (s) { return s.put(song); }).then(renderLib).catch(function () {}); }
+
   function renderLib() {
     return tx("readonly", function (s) { return s.getAll(); }).then(function (list) {
       list.sort(function (a, b) { return b.created - a.created; });
       var box = $("#lib"); box.textContent = "";
       $("#libCard").hidden = !list.length;
       list.forEach(function (it) {
-        var load = h("button", { class: "btn btn-small", type: "button", text: "فتح" });
+        var load = h("button", { class: "btn btn-small", type: "button", text: "فتح / تعديل الكلمات" });
         load.addEventListener("click", function () {
-          $("#title").value = it.title; $("#lyrics").value = it.lyrics; $("#style").value = it.style;
-          $("#lyricsCard").hidden = false; $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+          activeSongId = it.id;
+          $("#title").value = it.title;
+          $("#lyrics").value = it.lyrics || "";
+          $("#style").value = it.style || "";
+          $("#lyricsCard").hidden = false;
+          restoreSavedNotation(it);
+          if (it.blob) showTake(it.blob, it.title);
+          $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
         });
+
+        var dlTxt = h("button", { class: "btn btn-small", type: "button", text: "تنزيل الكلمات والنوتة" });
+        dlTxt.addEventListener("click", function () {
+          var content = [
+            "العنوان: " + it.title,
+            it.style ? "وصف الموسيقى: " + it.style : "",
+            it.lyrics ? "----------------------------------------\nالكلمات:\n" + it.lyrics : "",
+            it.sheetText ? "----------------------------------------\nالنوتة الموسيقية:\n" + it.sheetText : ""
+          ].filter(Boolean).join("\n\n");
+          triggerDownload(content, safeFileBase(it.title) + "_lyrics_and_notes.txt", "text/plain;charset=utf-8");
+        });
+
         var del = h("button", { class: "btn btn-small", type: "button", text: "حذف" });
-        del.addEventListener("click", function () { tx("readwrite", function (s) { return s.delete(it.id); }).then(renderLib); });
-        var row = h("div", { class: "lib-item" }, h("h3", { text: it.title }));
-        playerFor(it.blob, it.title).forEach(function (n) { row.appendChild(n); });
-        row.appendChild(h("div", { class: "actions" }, load, del));
+        del.addEventListener("click", function () {
+          if (activeSongId === it.id) activeSongId = "";
+          tx("readwrite", function (s) { return s.delete(it.id); }).then(renderLib);
+        });
+
+        var hasSheet = Boolean(it.sheetText || (it.sheetNotes && it.sheetNotes.length));
+        var badgeText = it.blob
+          ? (hasSheet ? "أغنية + كلمات + نوتة" : "أغنية + كلمات")
+          : (hasSheet ? "كلمات + نوتة محفوظة" : "كلمات محفوظة فقط");
+
+        var row = h("div", { class: "lib-item" },
+          h("div", { class: "sheet-head" },
+            h("h3", { text: it.title }),
+            h("span", { class: "badge", text: badgeText })
+          )
+        );
+        if (it.blob) {
+          playerFor(it.blob, it.title).forEach(function (n) { row.appendChild(n); });
+        }
+        row.appendChild(h("div", { class: "actions" }, load, dlTxt, del));
         box.appendChild(row);
       });
     }).catch(function () {});
