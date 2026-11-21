@@ -223,12 +223,13 @@
 
   /* Settings */
   $("#key").value = lsGet("ss.key", "");
-  $("#singModel").value = lsGet("ss.singModel", "lyria-3-clip");
-  $("#textModel").value = lsGet("ss.textModel", "gemini-3.8-flash");
+  var savedSingModel = lsGet("ss.singModel", "lyria-3-clip");
+  $("#singModel").value = (savedSingModel === "lyria-3-pro") ? "lyria-3-pro" : "lyria-3-clip";
+  $("#textModel").value = lsGet("ss.textModel", "gemini-3.8-flash") || "gemini-3.8-flash";
   if (!$("#key").value) $("#setup").open = true;
   $("#saveKey").addEventListener("click", function () {
     lsSet("ss.key", $("#key").value.trim());
-    lsSet("ss.singModel", $("#singModel").value);
+    lsSet("ss.singModel", $("#singModel").value || "lyria-3-clip");
     lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.8-flash");
     $("#keyStatus").textContent = "تم الحفظ.";
     if ($("#key").value.trim()) $("#setup").open = false;
@@ -274,12 +275,11 @@
     return "حدث خطأ: " + m;
   }
 
-  /* Music Notation Engine (Live Web Audio log + Suggested arrangement sheet) */
+  /* Music Notation Engine */
   var recordedNotes = [];
   var lastSheetPlain = "";
 
   function semitoneToNoteName(semitoneFromA3) {
-    // A3 is MIDI 57
     var midi = 57 + Math.round(semitoneFromA3);
     var idx = ((midi % 12) + 12) % 12;
     var octave = Math.floor(midi / 12) - 1;
@@ -291,7 +291,7 @@
     var m = s.match(/(\d{2,3})\s*bpm/i);
     var bpm = m ? Math.min(Math.max(parseInt(m[1], 10), 55), 150) : 72;
     var low = s.toLowerCase();
-    var scale = [0, 2, 3, 5, 7, 8, 10]; // Nahawand-like minor
+    var scale = [0, 2, 3, 5, 7, 8, 10];
     var scaleLabel = "نهاوند (Nahawand)";
     if (low.indexOf("hijaz") >= 0) { scale = [0, 1, 4, 5, 7, 8, 11]; scaleLabel = "حجاز (Hijaz)"; }
     else if (low.indexOf("kurd") >= 0) { scale = [0, 1, 3, 5, 7, 8, 10]; scaleLabel = "كرد (Kurd)"; }
@@ -312,14 +312,12 @@
       return node;
     }
 
-    // 5 staff lines
     var topY = 34, gap = 11;
     for (var i = 0; i < 5; i++) {
       var y = topY + i * gap;
       svg.appendChild(el("line", { x1: 24, y1: y, x2: 576, y2: y, stroke: "#6b645b", "stroke-width": "1.2" }));
     }
 
-    // Clef indicator
     var clef = el("text", { x: 32, y: topY + 34, fill: "#d98a1c", "font-size": "24", "font-family": "serif" });
     clef.textContent = "𝄞";
     svg.appendChild(clef);
@@ -338,23 +336,19 @@
     visible.forEach(function (n, idx) {
       var x = visible.length === 1 ? 300 : Math.round(startX + idx * stepX);
       var clampedSemi = Math.max(-7, Math.min(14, n.semi || 0));
-      // Map semitones onto staff vertical position
       var y = Math.round(topY + 44 - clampedSemi * 3.2);
       var isLast = idx === visible.length - 1;
 
-      // Stem
       svg.appendChild(el("line", {
         x1: x + 6, y1: y, x2: x + 6, y2: y - 24,
         stroke: isLast ? "#d98a1c" : "#efeae2", "stroke-width": "1.4"
       }));
 
-      // Note head
       svg.appendChild(el("ellipse", {
         cx: x, cy: y, rx: "6.5", ry: "4.6",
         fill: isLast ? "#d98a1c" : "#efeae2"
       }));
 
-      // Label below
       var lbl = el("text", {
         x: x, y: 115, fill: isLast ? "#d98a1c" : "#9e968b",
         "font-size": "10.5", "text-anchor": "middle", "font-family": "monospace"
@@ -409,7 +403,7 @@
     }
   });
 
-  /* Step 2: write lyrics */
+  /* Step 2: write lyrics with retry for temporary high demand */
   function textPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
     var req = $("#maqam").value;
@@ -438,33 +432,51 @@
     var key = needKey("#writeStatus"); if (!key) return;
     if (!$("#idea").value.trim()) { status("#writeStatus", "اكتب فكرة الأغنية أولاً.", true); return; }
     wctl = new AbortController();
-    $("#write").disabled = true; status("#writeStatus", "جاري كتابة الكلمات...");
-    try {
-      var model = lsGet("ss.textModel", "").trim() || $("#textModel").value.trim() || "gemini-3.8-flash";
-      var res = await callApi(API + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-        contents: [{ parts: [{ text: textPrompt() }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      }, key, wctl.signal);
-      var txt = res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts
-        ? res.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("") : "";
-      var d = parseJson(txt);
-      var secs = Array.isArray(d.sections) ? d.sections : [];
-      if (!secs.length) throw new Error("لم يولّد النموذج أقساماً للأغنية.");
-      $("#title").value = d.title || "أغنية جديدة";
-      $("#lyrics").value = secs.map(function (sec) {
-        var ls = Array.isArray(sec.lines) ? sec.lines.join("\n") : "";
-        return "[" + String(sec.label || "Verse") + "]\n" + ls;
-      }).join("\n\n");
-      $("#style").value = d.music_prompt || (state.genre + " " + state.mood + " song");
-      var note = $("#songNote"); note.textContent = d.note ? String(d.note) : ""; note.hidden = !d.note;
-      $("#lyricsCard").hidden = false;
-      status("#writeStatus", "تمت كتابة الكلمات. راجعها ثم اضغط غنِّ الأغنية.");
-      $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) {
-      status("#writeStatus", describeError(e), true);
-    } finally {
-      $("#write").disabled = false;
+    $("#write").disabled = true;
+
+    var maxRetries = 3;
+    var attempt = 0;
+
+    while (attempt <= maxRetries) {
+      attempt++;
+      status("#writeStatus", attempt === 1 ? "جاري كتابة الكلمات..." : "النموذج مضغوط مؤقتاً — إعادة المحاولة (" + attempt + "/" + (maxRetries + 1) + ")...");
+      try {
+        var model = ($("#textModel").value || lsGet("ss.textModel", "") || "gemini-3.8-flash").trim();
+        var res = await callApi(API + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+          contents: [{ parts: [{ text: textPrompt() }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        }, key, wctl.signal);
+
+        var txt = res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts
+          ? res.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("") : "";
+        var d = parseJson(txt);
+        var secs = Array.isArray(d.sections) ? d.sections : [];
+        if (!secs.length) throw new Error("لم يولّد النموذج أقساماً للأغنية.");
+
+        $("#title").value = d.title || "أغنية جديدة";
+        $("#lyrics").value = secs.map(function (sec) {
+          var ls = Array.isArray(sec.lines) ? sec.lines.join("\n") : "";
+          return "[" + String(sec.label || "Verse") + "]\n" + ls;
+        }).join("\n\n");
+        $("#style").value = d.music_prompt || (state.genre + " " + state.mood + " song");
+        var note = $("#songNote"); note.textContent = d.note ? String(d.note) : ""; note.hidden = !d.note;
+        $("#lyricsCard").hidden = false;
+        status("#writeStatus", "تمت كتابة الكلمات. راجعها ثم اضغط غنِّ الأغنية.");
+        $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+        break;
+      } catch (e) {
+        var msg = String((e && e.message) || e || "");
+        var isBusy = /high demand|overloaded|try again later|503|429/i.test(msg);
+        if (isBusy && attempt <= maxRetries && !(e && e.name === "AbortError")) {
+          await new Promise(function (r) { setTimeout(r, attempt * 2000); });
+          continue;
+        }
+        status("#writeStatus", describeError(e), true);
+        break;
+      }
     }
+
+    $("#write").disabled = false;
   });
 
   /* Browser Fallback (Web Audio + SpeechSynthesis) with Live Note Recording */
@@ -549,7 +561,7 @@
 
   function singPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
-    var full = lsGet("ss.singModel", "lyria-3-clip") === "lyria-3-pro";
+    var full = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip")) === "lyria-3-pro";
     return [
       full ? "Create a full length song of about 2 minutes." : "Create a 30 second song clip.",
       "Style: " + $("#style").value.trim() + ".",
@@ -582,7 +594,7 @@
     timer = setInterval(function () { status("#singStatus", "جاري غناء الأغنية... " + Math.round((Date.now() - t0) / 1000) + "ث"); }, 1000);
     status("#singStatus", "جاري غناء الأغنية...");
     try {
-      var model = lsGet("ss.singModel", "lyria-3-clip");
+      var model = ($("#singModel").value || lsGet("ss.singModel", "lyria-3-clip")).trim();
       var res = await callApi(API + "/v1beta/interactions", { model: model, input: singPrompt() }, key, actl.signal);
       var a = findAudio(res, 0);
       if (!a) {
