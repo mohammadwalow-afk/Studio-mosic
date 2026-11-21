@@ -99,7 +99,7 @@
       </div>
       <div class="field">
         <label class="label" for="textModel">نموذج كتابة الكلمات</label>
-        <input type="text" id="textModel" class="ltr" value="gemini-3.8-flash">
+        <input type="text" id="textModel" class="ltr" value="gemini-3.5-flash-lite">
       </div>
     </div>
     <div class="actions">
@@ -225,12 +225,12 @@
   $("#key").value = lsGet("ss.key", "");
   var savedSingModel = lsGet("ss.singModel", "lyria-3-clip");
   $("#singModel").value = (savedSingModel === "lyria-3-pro") ? "lyria-3-pro" : "lyria-3-clip";
-  $("#textModel").value = lsGet("ss.textModel", "gemini-3.8-flash") || "gemini-3.8-flash";
+  $("#textModel").value = lsGet("ss.textModel", "gemini-3.5-flash-lite") || "gemini-3.5-flash-lite";
   if (!$("#key").value) $("#setup").open = true;
   $("#saveKey").addEventListener("click", function () {
     lsSet("ss.key", $("#key").value.trim());
     lsSet("ss.singModel", $("#singModel").value || "lyria-3-clip");
-    lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.8-flash");
+    lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.5-flash-lite");
     $("#keyStatus").textContent = "تم الحفظ.";
     if ($("#key").value.trim()) $("#setup").open = false;
   });
@@ -403,7 +403,51 @@
     }
   });
 
-  /* Step 2: write lyrics with retry for temporary high demand */
+  /* Local Instant Draft Fallback when models are busy or unavailable */
+  function buildLocalDraft(ideaText) {
+    var cleanIdea = String(ideaText || "").trim().replace(/\s+/g, " ");
+    var shortTopic = cleanIdea.slice(0, 48) || "لحن جديد";
+    var maqamSel = $("#maqam").value;
+    var maqamEn = "Maqam Nahawand";
+    if (maqamSel === "حجاز") maqamEn = "Maqam Hijaz";
+    else if (maqamSel === "راست") maqamEn = "Maqam Rast";
+    else if (maqamSel === "بياتي") maqamEn = "Maqam Bayati";
+    else if (maqamSel === "كرد") maqamEn = "Maqam Kurd";
+    else if (maqamSel === "صبا") maqamEn = "Maqam Saba";
+    else if (maqamSel === "سيكا") maqamEn = "Maqam Sikah";
+
+    var bpm = (state.mood === "حماسي") ? 112 : ((state.mood === "هادئ ومريح" || state.mood === "شاعري حالم") ? 72 : 84);
+    var musicPrompt = state.genre + ", " + state.mood + ", " + bpm + " BPM, " + maqamEn + ", acoustic and melodic arrangement";
+
+    var lyrics = [
+      "[Intro]",
+      shortTopic,
+      "",
+      "[Verse 1]",
+      "في خفقةِ الروحِ يصحو الوترْ",
+      "يحكي عن الشوقِ وعن ما عبرْ",
+      "في كلِّ لحنٍ صدىً للحنينْ",
+      "والليلُ يهمسُ تحتَ القمرْ",
+      "",
+      "[Chorus]",
+      "هذا نداءُ الهوى والبيانْ",
+      "ينسابُ عذباً كرجعِ الزمانْ",
+      "يجمعُ أرواحَنا في المقامْ",
+      "ويبقى الوصلُ على كلِّ لسانْ",
+      "",
+      "[Outro]",
+      "تمضي الصدى ويبقى النغمْ"
+    ].join("\n");
+
+    return {
+      title: shortTopic,
+      lyrics: lyrics,
+      style: musicPrompt,
+      note: "تم توليد مسودة محلية فورية لأن النماذج السحابية كانت مشغولة؛ يمكنك تعديل الكلمات أو إعادة المحاولة لاحقاً."
+    };
+  }
+
+  /* Step 2: write lyrics with model fallback + instant draft fallback */
   function textPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
     var req = $("#maqam").value;
@@ -427,52 +471,83 @@
     throw new Error("لم يرجع النموذج JSON صالحاً.");
   }
 
+  function applyLyricsResult(titleVal, lyricsVal, styleVal, noteVal) {
+    $("#title").value = titleVal || "أغنية جديدة";
+    $("#lyrics").value = lyricsVal || "";
+    $("#style").value = styleVal || (state.genre + " " + state.mood + " song");
+    var note = $("#songNote");
+    note.textContent = noteVal ? String(noteVal) : "";
+    note.hidden = !noteVal;
+    $("#lyricsCard").hidden = false;
+    $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   var wctl = null;
   $("#write").addEventListener("click", async function () {
     var key = needKey("#writeStatus"); if (!key) return;
-    if (!$("#idea").value.trim()) { status("#writeStatus", "اكتب فكرة الأغنية أولاً.", true); return; }
+    var ideaVal = $("#idea").value.trim();
+    if (!ideaVal) { status("#writeStatus", "اكتب فكرة الأغنية أولاً.", true); return; }
     wctl = new AbortController();
     $("#write").disabled = true;
 
-    var maxRetries = 3;
-    var attempt = 0;
+    var primaryModel = ($("#textModel").value || lsGet("ss.textModel", "") || "gemini-3.5-flash-lite").trim();
+    var candidates = [primaryModel, "gemini-3.5-flash-lite", "gemini-3.8-flash"].filter(function (m, i, arr) {
+      return m && arr.indexOf(m) === i;
+    });
 
-    while (attempt <= maxRetries) {
-      attempt++;
-      status("#writeStatus", attempt === 1 ? "جاري كتابة الكلمات..." : "النموذج مضغوط مؤقتاً — إعادة المحاولة (" + attempt + "/" + (maxRetries + 1) + ")...");
-      try {
-        var model = ($("#textModel").value || lsGet("ss.textModel", "") || "gemini-3.8-flash").trim();
-        var res = await callApi(API + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
-          contents: [{ parts: [{ text: textPrompt() }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        }, key, wctl.signal);
+    var succeeded = false;
+    var lastErr = null;
 
-        var txt = res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts
-          ? res.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("") : "";
-        var d = parseJson(txt);
-        var secs = Array.isArray(d.sections) ? d.sections : [];
-        if (!secs.length) throw new Error("لم يولّد النموذج أقساماً للأغنية.");
+    for (var idx = 0; idx < candidates.length; idx++) {
+      var model = candidates[idx];
+      var attempt = 0;
+      var maxRetries = 1;
+      while (attempt <= maxRetries) {
+        attempt++;
+        status("#writeStatus", "جاري كتابة الكلمات عبر " + model + (attempt > 1 ? " (إعادة محاولة)" : "") + "...");
+        try {
+          var res = await callApi(API + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+            contents: [{ parts: [{ text: textPrompt() }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          }, key, wctl.signal);
 
-        $("#title").value = d.title || "أغنية جديدة";
-        $("#lyrics").value = secs.map(function (sec) {
-          var ls = Array.isArray(sec.lines) ? sec.lines.join("\n") : "";
-          return "[" + String(sec.label || "Verse") + "]\n" + ls;
-        }).join("\n\n");
-        $("#style").value = d.music_prompt || (state.genre + " " + state.mood + " song");
-        var note = $("#songNote"); note.textContent = d.note ? String(d.note) : ""; note.hidden = !d.note;
-        $("#lyricsCard").hidden = false;
-        status("#writeStatus", "تمت كتابة الكلمات. راجعها ثم اضغط غنِّ الأغنية.");
-        $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
-        break;
-      } catch (e) {
-        var msg = String((e && e.message) || e || "");
-        var isBusy = /high demand|overloaded|try again later|503|429/i.test(msg);
-        if (isBusy && attempt <= maxRetries && !(e && e.name === "AbortError")) {
-          await new Promise(function (r) { setTimeout(r, attempt * 2000); });
-          continue;
+          var txt = res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts
+            ? res.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("") : "";
+          var d = parseJson(txt);
+          var secs = Array.isArray(d.sections) ? d.sections : [];
+          if (!secs.length) throw new Error("لم يولّد النموذج أقساماً للأغنية.");
+
+          var formattedLyrics = secs.map(function (sec) {
+            var ls = Array.isArray(sec.lines) ? sec.lines.join("\n") : "";
+            return "[" + String(sec.label || "Verse") + "]\n" + ls;
+          }).join("\n\n");
+
+          applyLyricsResult(d.title, formattedLyrics, d.music_prompt, d.note);
+          status("#writeStatus", "تمت كتابة الكلمات عبر " + model + ". راجعها ثم اضغط غنِّ الأغنية.");
+          succeeded = true;
+          break;
+        } catch (e) {
+          lastErr = e;
+          if (e && e.name === "AbortError") break;
+          var msg = String((e && e.message) || e || "");
+          var isBusyOrMissing = /high demand|overloaded|try again later|no longer available|not found|503|429/i.test(msg) || (e && (e.http === 404 || e.http === 429 || e.http === 503));
+          if (isBusyOrMissing && attempt <= maxRetries) {
+            await new Promise(function (r) { setTimeout(r, 1200); });
+            continue;
+          }
+          break;
         }
-        status("#writeStatus", describeError(e), true);
-        break;
+      }
+      if (succeeded || (lastErr && lastErr.name === "AbortError")) break;
+    }
+
+    if (!succeeded) {
+      if (lastErr && lastErr.name === "AbortError") {
+        status("#writeStatus", describeError(lastErr), true);
+      } else {
+        var draft = buildLocalDraft(ideaVal);
+        applyLyricsResult(draft.title, draft.lyrics, draft.style, draft.note);
+        status("#writeStatus", "النماذج السحابية مشغولة حالياً — تم تجهيز مسودة فورية لتتمكن من المتابعة.");
       }
     }
 
