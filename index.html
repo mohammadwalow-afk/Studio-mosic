@@ -1,80 +1,81 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#15121f">
-<title>استوديو الأغاني</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;700&display=swap">
-<style>
-/* Layout concept: a four-step tape recorder. Setup, brief, lyrics and style, then the take (audio player). */
-:root {
-  --bg: #15121f; --surface: #1f1a2f; --surface2: #2a2340; --line: #3a3153;
-  --fg: #f1ecfa; --muted: #a79fbd; --accent: #f2b84b; --accent-ink: #1b1305; --danger: #ff9a9a;
-  --font-display: "Reem Kufi", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
-  --font-body: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-  color-scheme: dark;
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f7f4fb; --surface: #ffffff; --surface2: #efe9f8; --line: #d9cfea;
-    --fg: #1d1930; --muted: #6a6282; --accent: #b8740a; --accent-ink: #ffffff; --danger: #b3261e;
-    color-scheme: light;
-  }
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; }
-body {
-  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.7;
-  padding-block: max(20px, env(safe-area-inset-top, 0px)) max(48px, env(safe-area-inset-bottom, 0px));
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-#app { max-width: 720px; margin-inline: auto; display: flex; flex-direction: column; gap: 18px; }
-h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.3; text-wrap: balance; }
-h1 { font-size: 2rem; } h2 { font-size: 1.15rem; }
-p { margin: 0; }
-.sub { color: var(--muted); font-size: .95rem; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
-.field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.label { font-size: .85rem; color: var(--muted); font-weight: 500; }
-textarea, select, input[type="text"], input[type="password"] {
-  width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px;
-  padding: 10px 12px; font: inherit; min-width: 0;
-}
-textarea { min-height: 92px; resize: vertical; }
-textarea.lyrics { min-height: 260px; }
-.ltr { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: .88rem; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { font: inherit; font-size: .92rem; background: var(--surface2); color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
-.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); text-decoration: none; display: inline-block; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn.small { padding: 4px 12px; font-size: .85rem; font-weight: 500; }
-.btn:disabled { opacity: .55; cursor: default; }
-.status { color: var(--muted); font-size: .92rem; min-height: 1.4em; }
-.status.err { color: var(--danger); }
-.note { font-size: .9rem; border-inline-start: 3px solid var(--accent); padding: 2px 12px; color: var(--muted); }
-details.card > summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
-details.card[open] > summary { margin-bottom: 14px; }
-audio { width: 100%; }
-.take { display: flex; flex-direction: column; gap: 12px; }
-.lib-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
-.lib-item b { font-family: var(--font-display); font-size: 1.05rem; }
-.meter { font-family: var(--font-mono); color: var(--accent); font-size: 1.1rem; }
-@media (prefers-reduced-motion: no-preference) { .chip, .btn { transition: background .15s, border-color .15s; } }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141312">
+  <title>استوديو الأغاني</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono&display=swap">
+  <style>
+    /* Layout concept: a tabletop tape recorder. Setup, brief, lyrics and style, then the tape (audio player). */
+    :root {
+      --bg: #141312; --surface: #1c1b19; --surface2: #24221f; --line: #312e2a;
+      --fg: #efeae2; --muted: #9e968b; --accent: #d98a1c; --accent-ink: #141312; --danger: #e05a47;
+      --font-display: "IBM Plex Sans Arabic", "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+      --font-body: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+      color-scheme: dark;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f5f2ec; --surface: #ffffff; --surface2: #eee9df; --line: #dfd8ca;
+        --fg: #191816; --muted: #6b645b; --accent: #b86d08; --accent-ink: #ffffff; --danger: #c43d2b;
+        color-scheme: light;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.7;
+      padding-block: max(20px, env(safe-area-inset-top)) max(40px, env(safe-area-inset-bottom));
+      padding-left: max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
+    }
+    .app { max-width: 720px; margin-inline: auto; display: flex; flex-direction: column; gap: 18px; }
+    h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; line-height: 1.3; text-wrap: balance; }
+    h1 { font-size: 2rem; } h2 { font-size: 1.15rem; }
+    p { margin: 0; }
+    .sub { color: var(--muted); font-size: .95rem; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .label { font-size: .9rem; color: var(--muted); font-weight: 600; }
+    textarea, select, input[type="text"], input[type="password"] {
+      width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; font: inherit; min-width: 0;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    textarea.lyrics { min-height: 200px; }
+    .ltr { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: .88rem; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { font: inherit; font-size: .9rem; background: var(--surface2); color: var(--fg); border: 1px solid var(--line);
+      border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+    .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); }
+    .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .btn-small { padding: 6px 12px; font-size: .85rem; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .status { color: var(--muted); font-size: .9rem; line-height: 1.5; }
+    .status.err { color: var(--danger); }
+    .note { font-size: .85rem; border-inline-start: 3px solid var(--accent); padding: 2px 10px; color: var(--muted); }
+    details.card summary { cursor: pointer; font-family: var(--font-display); font-weight: 700; list-style: none; }
+    details.card[open] summary { margin-bottom: 4px; }
+    audio { width: 100%; }
+    .lib { display: flex; flex-direction: column; gap: 10px; }
+    .lib-item { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+    .lib-item h3 { font-family: var(--font-display); font-size: 1rem; }
+    .meta { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); }
+    @media (prefers-reduced-motion: reduce) { .chip, .btn { transition: none; } }
+  </style>
 </head>
 <body>
-<div id="app">
+<div class="app">
   <header>
     <h1>استوديو الأغاني</h1>
-    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنّى بصوت وموسيقى كاملة.</p>
+    <p class="sub">اكتب فكرة، فتُكتب الكلمات ثم تُغنَّى بصوت وموسيقى كاملة.</p>
   </header>
 
   <details class="card" id="setup">
@@ -88,34 +89,37 @@ audio { width: 100%; }
       <div class="field">
         <label class="label" for="singModel">نموذج الغناء</label>
         <select id="singModel">
-          <option value="lyria-3.5">Lyria 3.5: أغنية كاملة</option>
-          <option value="lyria-3-clip-preview">Lyria 3 Clip: ٣٠ ثانية للتجربة</option>
+          <option value="lyria-3-clip">Lyria 3 Clip: ٣٠ ثانية للتجربة</option>
+          <option value="lyria-3-pro">Lyria 3 Pro: أغنية كاملة (دقيقتان)</option>
         </select>
       </div>
       <div class="field">
         <label class="label" for="textModel">نموذج كتابة الكلمات</label>
-        <input type="text" id="textModel" class="ltr" value="gemini-2.5-flash">
+        <input type="text" id="textModel" class="ltr" value="gemini-3.8-flash">
       </div>
     </div>
-    <div class="actions"><button class="btn primary" id="saveKey" type="button">حفظ الإعدادات</button><span class="status" id="setupStatus"></span></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="saveKey" type="button">حفظ الإعدادات</button>
+      <span class="status" id="keyStatus"></span>
+    </div>
   </details>
 
   <section class="card" aria-label="الفكرة">
     <h2>٢. الفكرة</h2>
     <div class="field">
       <label class="label" for="idea">عن ماذا تريد الأغنية؟</label>
-      <textarea id="idea">أغنية عن الحنين إلى مدينة قديمة في ليلة مطر، وعن صديق بعيد لا يزال يتذكرني.</textarea>
+      <textarea id="idea" placeholder="مثال: أغنية عن الحنين إلى مدينة قديمة في ليلة مطر، وعن صديق بعيد لا يزال يتذكرني."></textarea>
     </div>
-    <div class="field"><span class="label">اللغة</span><div class="chips" id="g-lang"></div></div>
-    <div class="field" id="dialect-field"><label class="label" for="dialect">اللهجة</label><select id="dialect"></select></div>
-    <div class="field"><span class="label">الأسلوب</span><div class="chips" id="g-genre"></div></div>
-    <div class="field"><span class="label">المزاج</span><div class="chips" id="g-mood"></div></div>
+    <div class="field"><span class="label">اللغة</span><div class="chips" id="langChips" role="group"></div></div>
+    <div class="field" id="dialectField"><label class="label" for="dialect">اللهجة</label><select id="dialect"></select></div>
+    <div class="field"><span class="label">النوع الموسيقي</span><div class="chips" id="genreChips" role="group"></div></div>
+    <div class="field"><span class="label">المزاج</span><div class="chips" id="moodChips" role="group"></div></div>
     <div class="row">
       <div class="field"><label class="label" for="maqam">المقام</label><select id="maqam"></select></div>
       <div class="field"><label class="label" for="voice">الصوت</label><select id="voice"></select></div>
     </div>
     <div class="actions">
-      <button class="btn primary" id="write" type="button">اكتب الكلمات</button>
+      <button class="btn btn-primary" id="write" type="button">اكتب الكلمات</button>
       <span class="status" id="writeStatus" role="status"></span>
     </div>
   </section>
@@ -124,11 +128,11 @@ audio { width: 100%; }
     <h2>٣. الكلمات والأسلوب</h2>
     <p class="sub">عدّل ما تشاء قبل الغناء. الوسوم بين الأقواس مثل [Verse 1] تحدد أقسام الأغنية.</p>
     <div class="field"><label class="label" for="title">العنوان</label><input type="text" id="title"></div>
-    <div class="field"><label class="label" for="lyrics">الكلمات</label><textarea id="lyrics" class="lyrics" dir="auto"></textarea></div>
+    <div class="field"><label class="label" for="lyrics">الكلمات</label><textarea id="lyrics" class="lyrics"></textarea></div>
     <div class="field"><label class="label" for="style">وصف الموسيقى (بالإنجليزية)</label><textarea id="style" class="ltr"></textarea></div>
     <p class="note" id="songNote" hidden></p>
     <div class="actions">
-      <button class="btn primary" id="sing" type="button">غنِّ الأغنية</button>
+      <button class="btn btn-primary" id="sing" type="button">غنِّ الأغنية</button>
       <button class="btn" id="stop" type="button" hidden>إيقاف</button>
       <span class="status" id="singStatus" role="status"></span>
     </div>
@@ -137,174 +141,269 @@ audio { width: 100%; }
 
   <section class="card" id="libCard" hidden>
     <h2>أغانيك المحفوظة</h2>
-    <div id="lib" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="lib" class="lib" style="display:flex;flex-direction:column;gap:10px"></div>
   </section>
 </div>
 
 <script>
 (function () {
   "use strict";
-  var API = "https://generativelanguage.googleapis.com/v1beta";
+  var API = "https://generativelanguage.googleapis.com";
   var LANGS = [
     { id: "ar", label: "عربي", name: "Arabic", prompt: "Arabic (Arabic script)" },
     { id: "en", label: "English", name: "English", prompt: "English" },
-    { id: "ckb", label: "كردي سوراني", name: "Central Kurdish (Sorani)", prompt: "Central Kurdish (Sorani), written in the Kurdish Arabic-script alphabet" },
-    { id: "kmr", label: "كردي كرمانجي", name: "Northern Kurdish (Kurmanji)", prompt: "Northern Kurdish (Kurmanji), written in the Latin Kurdish alphabet" }
+    { id: "ckb", label: "کوردی سۆرانی", name: "Central Kurdish (Sorani)", prompt: "Central Kurdish (Sorani), written in the Arabic script" },
+    { id: "kmr", label: "Kurmancî", name: "Northern Kurdish (Kurmanji)", prompt: "Northern Kurdish (Kurmanji), written in the Latin script" }
   ];
-  var DIALECTS = ["فصحى مبسطة", "عراقي", "خليجي", "شامي", "مصري", "مغربي"];
-  var GENRES = ["بوب", "طرب كلاسيكي", "راب", "هادئ", "شعبي ودبكة", "روك", "إلكتروني"];
-  var MOODS = ["حنين", "فرح", "حماسة", "رومانسي", "حزين", "وطني"];
-  var MAQAMS = ["اختر لي", "حجاز", "راست", "بيات", "صبا", "نهاوند", "كرد", "عجم", "سيكا", "ماجور", "مينور"];
-  var VOICES = ["رجالي", "نسائي", "ثنائي", "كورال"];
-  var VOICE_EN = { "رجالي": "male", "نسائي": "female", "ثنائي": "male and female duet", "كورال": "choir" };
-  var GENRE_EN = { "بوب": "pop", "طرب كلاسيكي": "classical Arabic tarab", "راب": "rap", "هادئ": "calm acoustic", "شعبي ودبكة": "folk dabke", "روك": "rock", "إلكتروني": "electronic" };
-  var state = { lang: "ar", genre: "بوب", mood: "حنين" };
-  var $ = function (s) { return document.querySelector(s); };
+  var DIALECTS = ["فصحى شاعرية", "مصري", "شامي / لبناني", "خليجي", "عراقي", "مغاربي"];
+  var GENRES = ["هادئ وأكوستيك", "شرقي معاصر", "كلاسيكي / عربي", "روك", "إلكتروني", "هيب هوب"];
+  var MOODS = ["شاعري حالم", "حزين وشجي", "مفعم بالأمل", "حماسي", "داكن وغامض", "هادئ ومريح"];
+  var MAQAMS = ["اختر لي", "نهاوند", "حجاز", "راست", "بياتي", "كرد", "صبا", "سيكا"];
+  var VOICES = ["نسائي", "رجالي", "ثنائي / كورال", "كورال"];
+  var VOICE_EN = { "نسائي": "female", "رجالي": "male", "ثنائي / كورال": "male and female duet", "كورال": "choir" };
+  var MAQAM_EN = { "اختر لي": "", "نهاوند": "Maqam Nahawand", "حجاز": "Maqam Hijaz", "راست": "Maqam Rast", "بياتي": "Maqam Bayati", "كرد": "Maqam Kurd", "صبا": "Maqam Saba", "سيكا": "Maqam Sikah" };
+  var state = { lang: "ar", genre: "هادئ وأكوستيك", mood: "شاعري حالم" };
 
-  function h(tag, attrs) {
+  var $ = function (s) { return document.querySelector(s); };
+  function h(tag, attrs, kids) {
     var el = document.createElement(tag);
-    for (var k in (attrs || {})) {
+    for (var k in attrs || {}) {
       if (k === "text") el.textContent = attrs[k];
       else if (k === "class") el.className = attrs[k];
-      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2), attrs[k]);
+      else if (k.indexOf("on") === 0) el.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
       else el.setAttribute(k, attrs[k]);
     }
-    for (var i = 2; i < arguments.length; i++) { var c = arguments[i]; if (c != null) el.append(c.nodeType ? c : document.createTextNode(String(c))); }
+    for (var i = 2; i < arguments.length; i++) {
+      if (arguments[i] != null) el.appendChild(typeof arguments[i] === "string" ? document.createTextNode(arguments[i]) : arguments[i]);
+    }
     return el;
   }
-  function lsGet(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-  function chipGroup(id, items, key, objs) {
+  function lsGet(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch (c) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (c) {} }
+
+  function chipGroup(id, items, key, dflt) {
     var box = $(id);
     items.forEach(function (it) {
-      var val = objs ? it.id : it, label = objs ? it.label : it;
+      var val = it && it.id ? it.id : it, label = it && it.label ? it.label : it;
       var b = h("button", { class: "chip", type: "button", text: label, "aria-pressed": String(state[key] === val) });
       b.addEventListener("click", function () {
         state[key] = val;
         box.querySelectorAll(".chip").forEach(function (c) { c.setAttribute("aria-pressed", String(c === b)); });
-        if (key === "lang") $("#dialect-field").hidden = val !== "ar";
+        if (key === "lang") $("#dialectField").hidden = val !== "ar";
       });
-      box.append(b);
+      box.appendChild(b);
     });
   }
-  function fillSelect(id, items) { items.forEach(function (t) { $(id).append(h("option", { value: t, text: t })); }); }
-  chipGroup("#g-lang", LANGS, "lang", true); chipGroup("#g-genre", GENRES, "genre"); chipGroup("#g-mood", MOODS, "mood");
-  fillSelect("#dialect", DIALECTS); fillSelect("#maqam", MAQAMS); fillSelect("#voice", VOICES);
+
+  function fillSelect(id, items) { items.forEach(function (t) { $(id).appendChild(h("option", { value: t, text: t })); }); }
+  chipGroup("#langChips", LANGS, "lang", "ar");
+  chipGroup("#genreChips", GENRES, "genre", GENRES[0]);
+  chipGroup("#moodChips", MOODS, "mood", MOODS[0]);
+  fillSelect("#dialect", DIALECTS);
+  fillSelect("#maqam", MAQAMS);
+  fillSelect("#voice", VOICES);
 
   /* Settings */
   $("#key").value = lsGet("ss.key", "");
-  $("#singModel").value = lsGet("ss.singModel", "lyria-3.5");
-  $("#textModel").value = lsGet("ss.textModel", "gemini-2.5-flash");
+  $("#singModel").value = lsGet("ss.singModel", "lyria-3-clip");
+  $("#textModel").value = lsGet("ss.textModel", "gemini-3.8-flash");
   if (!$("#key").value) $("#setup").open = true;
   $("#saveKey").addEventListener("click", function () {
-    lsSet("ss.key", $("#key").value.trim()); lsSet("ss.singModel", $("#singModel").value); lsSet("ss.textModel", $("#textModel").value.trim());
-    $("#setupStatus").textContent = "تم الحفظ.";
+    lsSet("ss.key", $("#key").value.trim());
+    lsSet("ss.singModel", $("#singModel").value);
+    lsSet("ss.textModel", $("#textModel").value.trim() || "gemini-3.8-flash");
+    $("#keyStatus").textContent = "تم الحفظ.";
     if ($("#key").value.trim()) $("#setup").open = false;
   });
 
-  function status(id, text, err) { var s = $(id); s.textContent = text; s.className = "status" + (err ? " err" : ""); }
+  function status(id, txt, err) {
+    var s = $(id);
+    s.textContent = txt;
+    s.className = "status" + (err ? " err" : "");
+  }
+
   function needKey(id) {
-    var k = lsGet("ss.key", "").trim();
-    if (!k) { status(id, "أدخل مفتاح Gemini API في الإعدادات أولاً.", true); $("#setup").open = true; }
+    var k = ($("#key").value || lsGet("ss.key", "")).trim();
+    if (!k) { status(id, "أدخل مفتاح Gemini API أولاً.", true); $("#setup").open = true; }
     return k;
   }
+
   async function callApi(url, body, key, signal) {
-    var r = await fetch(url, { method: "POST", signal: signal, headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) });
+    var r = await fetch(url, {
+      method: "POST",
+      signal: signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify(body)
+    });
     var data = null, raw = "";
     try { raw = await r.text(); data = JSON.parse(raw); } catch (e) {}
     if (!r.ok) {
-      var msg = data && data.error && data.error.message ? data.error.message : ("HTTP " + r.status);
-      var err = new Error(msg); err.http = r.status; throw err;
+      var msg = (data && data.error && data.error.message) || data.error || ("HTTP " + r.status);
+      var err = new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+      err.http = r.status;
+      throw err;
     }
     return data;
   }
+
   function describeError(e) {
     if (e && e.name === "AbortError") return "تم الإيقاف.";
     var m = (e && e.message) || "";
-    if (e && (e.http === 400 || e.http === 403) && /API key|permission|PERMISSION|key/i.test(m)) return "المفتاح غير صحيح أو غير مسموح له بهذه الخدمة: " + m;
+    if (e && (e.http === 400 || e.http === 403) && /API key|PERMISSION_DENIED|invalid/i.test(m)) return "تحقق من صحة مفتاح API: " + m;
     if (e && e.http === 404) return "اسم النموذج غير موجود عند Google. غيّره في الإعدادات. الرسالة: " + m;
     if (e && e.http === 429) return "تجاوزت الحد المسموح. انتظر قليلاً أو راجع رصيد حسابك. " + m;
-    if (e instanceof TypeError) return "فشل الاتصال بالإنترنت أو منعه المتصفح (CORS). " + m;
+    if (e instanceof TypeError) return "تعذر الاتصال بالخادم (تحقق من الإنترنت أو CORS): " + m;
     return "حدث خطأ: " + m;
   }
 
   /* Step 2: write lyrics */
   function textPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
-    var maq = $("#maqam").value;
+    var req = $("#idea").value.trim();
     return [
       "You are a songwriter and music arranger. Write an ORIGINAL song from the brief below.",
-      "All lyrics must be in " + lang.prompt + (state.lang === "ar" ? ", dialect: " + $("#dialect").value : "") + ". Singable lines, natural rhyme, no copying of any existing song, no real artist names.",
+      "All lyrics must be in " + lang.prompt + (state.lang === "ar" ? ", dialect: " + $("#dialect").value : "") + ".",
       "Brief: " + $("#idea").value.trim(),
       "Genre: " + state.genre + ". Mood: " + state.mood + ". Voice: " + $("#voice").value + ".",
-      maq === "اختر لي" ? "Choose a maqam or key that suits the genre and language." : "Maqam: " + maq + ".",
-      "Structure: Intro, Verse 1, Chorus, Verse 2, Chorus, Bridge, Chorus, Outro. Each lyric section has 4 lines. Intro and Outro have an empty lyrics array.",
-      "If the language is Kurdish, keep the vocabulary simple and set note to one short Arabic sentence asking a Kurdish speaker to review the spelling. Otherwise note is an empty string.",
-      "Reply with only one JSON object: {\"title\": string, \"music_prompt\": string (English, max 300 characters: genre, tempo in BPM, maqam or key, instruments, mood, vocalist type; no artist names), \"sections\": [{\"tag\": string (one of Intro, Verse 1, Chorus, Verse 2, Bridge, Outro), \"lyrics\": [string]}], \"note\": string}"
+      req === "اختر لي" ? "Choose a maqam or key that suits the genre and language." : "Maqam: " + req + ".",
+      "Structure: Intro, Verse 1, Chorus, Verse 2, Chorus, Bridge, Chorus, Outro. Each lyric section has 4 lines. Intro and Outro may be brief.",
+      "If the language is Kurdish, keep the vocabulary simple and note in one short Arabic sentence asking a Kurdish speaker to review the lyrics.",
+      "Reply with ONLY one JSON object: {\"title\": string, \"music_prompt\": string (English, max 300 characters: genre, instruments, tempo BPM, mood, maqam), \"sections\": [{\"label\": string, \"lines\": [string]}]}."
     ].join("\n");
   }
+
   function parseJson(t) {
-    t = String(t || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    try { return JSON.parse(t); } catch (e) {}
-    var a = t.indexOf("{"), b = t.lastIndexOf("}");
-    if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
-    throw new Error("الرد ليس بصيغة صحيحة. أعد المحاولة.");
+    var s = String(t || "").replace(/```json\s*/gi, "").replace(/```/g, "").trim();
+    try { return JSON.parse(s); } catch (e) {}
+    var a = s.indexOf("{"), b = s.lastIndexOf("}");
+    if (a >= 0 && b > a) return JSON.parse(s.slice(a, b + 1));
+    throw new Error("لم يرجع النموذج JSON صالحاً.");
   }
+
   var wctl = null;
   $("#write").addEventListener("click", async function () {
     var key = needKey("#writeStatus"); if (!key) return;
-    if (!$("#idea").value.trim()) { status("#writeStatus", "اكتب الفكرة أولاً.", true); return; }
-    $("#write").disabled = true; status("#writeStatus", "أكتب الكلمات...");
+    if (!$("#idea").value.trim()) { status("#writeStatus", "اكتب فكرة الأغنية أولاً.", true); return; }
     wctl = new AbortController();
+    $("#write").disabled = true; status("#writeStatus", "جاري كتابة الكلمات...");
     try {
-      var model = lsGet("ss.textModel", "gemini-2.5-flash").trim() || "gemini-2.5-flash";
-      var res = await callApi(API + "/models/" + encodeURIComponent(model) + ":generateContent",
-        { contents: [{ parts: [{ text: textPrompt() }] }], generationConfig: { responseMimeType: "application/json" } }, key, wctl.signal);
+      var model = lsGet("ss.textModel", "").trim() || $("#textModel").value.trim() || "gemini-3.8-flash";
+      var res = await callApi(API + "/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
+        contents: [{ parts: [{ text: textPrompt() }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      }, key, wctl.signal);
       var txt = res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts
         ? res.candidates[0].content.parts.map(function (p) { return p.text || ""; }).join("") : "";
       var d = parseJson(txt);
       var secs = Array.isArray(d.sections) ? d.sections : [];
-      if (!secs.length) throw new Error("لم تصل أي أقسام. أعد المحاولة.");
-      $("#title").value = String(d.title || "أغنية بلا عنوان");
-      $("#lyrics").value = secs.map(function (s) {
-        var ls = Array.isArray(s.lyrics) ? s.lyrics.map(String) : [];
-        return "[" + String(s.tag || "Verse") + "]" + (ls.length ? "\n" + ls.join("\n") : "");
+      if (!secs.length) throw new Error("لم يولّد النموذج أقساماً للأغنية.");
+      $("#title").value = d.title || "أغنية جديدة";
+      $("#lyrics").value = secs.map(function (sec) {
+        var ls = Array.isArray(sec.lines) ? sec.lines.join("\n") : "";
+        return "[" + String(sec.label || "Verse") + "]\n" + ls;
       }).join("\n\n");
-      $("#style").value = String(d.music_prompt || GENRE_EN[state.genre] + " song");
-      var note = $("#songNote"); note.textContent = String(d.note || ""); note.hidden = !d.note;
+      $("#style").value = d.music_prompt || (state.genre + " " + state.mood + " song");
+      var note = $("#songNote"); note.textContent = d.note ? String(d.note) : ""; note.hidden = !d.note;
       $("#lyricsCard").hidden = false;
-      status("#writeStatus", "تمت كتابة الكلمات. راجعها ثم اضغط غنِّ.");
+      status("#writeStatus", "تمت كتابة الكلمات. راجعها ثم اضغط غنِّ الأغنية.");
       $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (e) { status("#writeStatus", describeError(e), true); }
-    finally { $("#write").disabled = false; }
+    } catch (e) {
+      status("#writeStatus", describeError(e), true);
+    } finally {
+      $("#write").disabled = false;
+    }
   });
 
-  /* Step 4: sing with Lyria */
-  function b64ToBlob(b64, mime) {
-    var bin = atob(b64), u8 = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    return new Blob([u8], { type: mime });
+  /* Browser Fallback (Web Audio + SpeechSynthesis) */
+  var fbCtx = null, fbTimer = null;
+  function stopFallbackAudio() {
+    if (fbTimer) { clearInterval(fbTimer); fbTimer = null; }
+    if ("speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (_) {} }
+    if (fbCtx) { fbCtx.close().catch(function () {}); fbCtx = null; }
   }
+
+  function parseStyleInfo(styleStr) {
+    var s = String(styleStr || "");
+    var m = s.match(/(\d{2,3})\s*bpm/i);
+    var bpm = m ? Math.min(Math.max(parseInt(m[1], 10), 55), 150) : 72;
+    var low = s.toLowerCase();
+    var scale = [0, 2, 3, 5, 7, 8, 10];
+    if (low.indexOf("hijaz") >= 0) scale = [0, 1, 4, 5, 7, 8, 11];
+    else if (low.indexOf("kurd") >= 0) scale = [0, 1, 3, 5, 7, 8, 10];
+    else if (low.indexOf("rast") >= 0 || low.indexOf("major") >= 0) scale = [0, 2, 4, 5, 7, 9, 11];
+    return { bpm: bpm, scale: scale };
+  }
+
+  function startBrowserFallback(lyricsStr, styleStr, onDone) {
+    stopFallbackAudio();
+    var info = parseStyleInfo(styleStr);
+    var beatMs = Math.round((60 / info.bpm) * 1000);
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      fbCtx = new AC();
+      var step = 0, pat = [0, 2, 4, 2, 3, 4, 2, 1];
+      fbTimer = setInterval(function () {
+        if (!fbCtx || fbCtx.state === "closed") return;
+        var deg = pat[step % pat.length];
+        var semi = info.scale[deg % info.scale.length];
+        var freq = 220 * Math.pow(2, semi / 12);
+        var osc = fbCtx.createOscillator(), g = fbCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq, fbCtx.currentTime);
+        g.gain.setValueAtTime(0.0001, fbCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.07, fbCtx.currentTime + 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, fbCtx.currentTime + (beatMs / 1000) * 0.9);
+        osc.connect(g); g.connect(fbCtx.destination);
+        osc.start(); osc.stop(fbCtx.currentTime + (beatMs / 1000) * 0.92);
+        step++;
+      }, beatMs);
+    }
+    var spoken = String(lyricsStr || "").replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
+    if ("speechSynthesis" in window && spoken) {
+      var u = new SpeechSynthesisUtterance(spoken);
+      u.lang = (state.lang === "en") ? "en-US" : ((state.lang === "ckb" || state.lang === "kmr") ? "ar-IQ" : "ar-SA");
+      u.rate = 0.88;
+      u.onend = function () { stopFallbackAudio(); if (onDone) onDone(); };
+      u.onerror = function () { stopFallbackAudio(); if (onDone) onDone(); };
+      window.speechSynthesis.speak(u);
+    } else if (onDone) {
+      setTimeout(function () { stopFallbackAudio(); onDone(); }, 15000);
+    }
+  }
+
+  /* Step 4: Sing with Lyria */
+  function b64ToBlob(b64, mime) {
+    var bin = atob(b64), n = bin.length, u8 = new Uint8Array(n);
+    for (var i = 0; i < n; i++) u8[i] = bin.charCodeAt(i);
+    return new Blob([u8], { type: mime || "audio/mpeg" });
+  }
+
   function findAudio(o, depth) {
     if (!o || typeof o !== "object" || depth > 8) return null;
-    var data = typeof o.data === "string" ? o.data : null;
-    var mime = o.mime_type || o.mimeType || "";
-    if (data && data.length > 2000 && (o.type === "audio" || /audio/i.test(mime))) return { data: data, mime: mime };
-    for (var k in o) { var r = findAudio(o[k], depth + 1); if (r) return r; }
+    if (typeof o.data === "string" && o.data.length > 500) {
+      var mime = o.mimeType || o.mime_type || "";
+      if (!mime || /^audio\//i.test(mime)) return { data: o.data, mime: mime || "audio/mpeg" };
+    }
+    for (var k in o) {
+      var r = findAudio(o[k], depth + 1);
+      if (r) return r;
+    }
     return null;
   }
+
   function collectText(o, out, depth) {
     if (!o || typeof o !== "object" || depth > 8) return out;
     if (o.type === "text" && typeof o.text === "string") out.push(o.text);
     for (var k in o) collectText(o[k], out, depth + 1);
     return out;
   }
+
   function singPrompt() {
     var lang = LANGS.filter(function (x) { return x.id === state.lang; })[0];
-    var full = lsGet("ss.singModel", "lyria-3.5") === "lyria-3.5";
+    var full = lsGet("ss.singModel", "lyria-3-clip") === "lyria-3-pro";
     return [
-      full ? "Create a full-length song of about 2 minutes." : "Create a 30-second song clip.",
+      full ? "Create a full length song of about 2 minutes." : "Create a 30 second song clip.",
       "Style: " + $("#style").value.trim() + ".",
       "Vocalist: " + (VOICE_EN[$("#voice").value] || "male") + " singer, original voice, not imitating any real singer.",
       "The vocals are sung in " + lang.name + ".",
@@ -313,47 +412,73 @@ audio { width: 100%; }
       $("#lyrics").value.trim()
     ].join("\n");
   }
-  var sctl = null, timer = null;
-  $("#stop").addEventListener("click", function () { if (sctl) sctl.abort(); });
+
+  var actl = null, timer = null;
+  $("#stop").addEventListener("click", function () {
+    stopFallbackAudio();
+    if (actl) actl.abort();
+    clearInterval(timer);
+    $("#sing").disabled = false;
+    $("#stop").hidden = true;
+    status("#singStatus", "تم الإيقاف.");
+  });
+
   $("#sing").addEventListener("click", async function () {
+    stopFallbackAudio();
     var key = needKey("#singStatus"); if (!key) return;
-    if (!$("#lyrics").value.trim()) { status("#singStatus", "الكلمات فارغة.", true); return; }
-    sctl = new AbortController();
+    if (!$("#lyrics").value.trim()) { status("#singStatus", "اكتب الكلمات أولاً.", true); return; }
+    actl = new AbortController();
     $("#sing").disabled = true; $("#stop").hidden = false;
     var t0 = Date.now();
     clearInterval(timer);
-    timer = setInterval(function () { status("#singStatus", "الغناء قيد التسجيل... " + Math.round((Date.now() - t0) / 1000) + " ثانية. قد يستغرق دقائق."); }, 1000);
-    status("#singStatus", "الغناء قيد التسجيل...");
+    timer = setInterval(function () { status("#singStatus", "جاري غناء الأغنية... " + Math.round((Date.now() - t0) / 1000) + "ث"); }, 1000);
+    status("#singStatus", "جاري غناء الأغنية...");
     try {
-      var model = lsGet("ss.singModel", "lyria-3.5");
-      var res = await callApi(API + "/interactions", { model: model, input: singPrompt() }, key, sctl.signal);
+      var model = lsGet("ss.singModel", "lyria-3-clip");
+      var res = await callApi(API + "/v1beta/interactions", { model: model, input: singPrompt() }, key, actl.signal);
       var a = findAudio(res, 0);
       if (!a) {
         var t = collectText(res, [], 0).join(" ").slice(0, 300);
-        throw new Error("لم يصل صوت. ربما رُفض الطلب بسبب الأمان أو لأن الكلمات تطابق أغنية معروفة. " + (t ? "رد النموذج: " + t : ""));
+        throw new Error("لم يرجع النموذج مقطعاً صوتياً. قد لا يدعم حسابك أو مفتاحك توليد الموسيقى حالياً. " + t);
       }
-      var mime = /^audio\//.test(a.mime) ? a.mime : (a.data.slice(0, 5) === "UklGR" ? "audio/wav" : "audio/mpeg");
+      var mime = /^audio\//i.test(a.mime) ? a.mime : (a.data.slice(0, 3) === "Ukl" ? "audio/wav" : "audio/mpeg");
       var blob = b64ToBlob(a.data, mime);
       showTake(blob, $("#title").value.trim() || "أغنية");
-      await save({ id: String(Date.now()), title: $("#title").value.trim() || "أغنية", lyrics: $("#lyrics").value, style: $("#style").value, created: Date.now(), blob: blob });
-      status("#singStatus", "جاهزة. حُفظت الأغنية في مكتبتك على هذا الجهاز.");
-    } catch (e) { status("#singStatus", describeError(e), true); }
-    finally { clearInterval(timer); $("#sing").disabled = false; $("#stop").hidden = true; }
+      await save({ id: String(Date.now()), title: $("#title").value.trim() || "أغنية", lyrics: $("#lyrics").value, style: $("#style").value, blob: blob, created: Date.now() });
+      clearInterval(timer);
+      $("#sing").disabled = false; $("#stop").hidden = true;
+      status("#singStatus", "تمت العملية. الأغنية محفوظة على جهازك.");
+    } catch (e) {
+      clearInterval(timer);
+      var emsg = String((e && e.message) || e || "");
+      var isQuotaOrTier = emsg.indexOf("limit: 0") >= 0 || emsg.indexOf("429") >= 0 || emsg.toLowerCase().indexOf("rate limit") >= 0 || emsg.toLowerCase().indexOf("quota") >= 0;
+      if (isQuotaOrTier) {
+        status("#singStatus", "حد Lyria المجاني غير متاح حالياً — تم تشغيل المعاينة الموسيقية والصوتية المحلية.");
+        startBrowserFallback($("#lyrics").value, $("#style").value, function () {
+          $("#sing").disabled = false; $("#stop").hidden = true;
+          status("#singStatus", "انتهت المعاينة المحلية.");
+        });
+        return;
+      }
+      $("#sing").disabled = false; $("#stop").hidden = true;
+      status("#singStatus", describeError(e), true);
+    }
   });
 
-  function extOf(blob) { return /wav/.test(blob.type) ? "wav" : "mp3"; }
+  function extOf(blob) { return /wav/i.test(blob.type) ? "wav" : "mp3"; }
   function playerFor(blob, title) {
     var url = URL.createObjectURL(blob);
-    var name = title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "song";
+    var name = title.replace(/[^\w\u0600-\u06FF-]+/g, "_").trim() || "song";
     return [
       h("audio", { controls: "", src: url }),
-      h("div", { class: "actions" }, h("a", { class: "btn", href: url, download: name + "." + extOf(blob), text: "تنزيل الملف الصوتي" }))
+      h("div", { class: "actions" }, h("a", { class: "btn btn-small", href: url, download: name + "." + extOf(blob), text: "تحميل" }))
     ];
   }
+
   function showTake(blob, title) {
     var box = $("#take"); box.textContent = "";
-    box.append(h("h3", { text: title }));
-    playerFor(blob, title).forEach(function (n) { box.append(n); });
+    box.appendChild(h("h3", { text: title }));
+    playerFor(blob, title).forEach(function (n) { box.appendChild(n); });
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -366,15 +491,18 @@ audio { width: 100%; }
       r.onerror = function () { rej(r.error); };
     });
   }
+
   function tx(mode, fn) {
     return idb().then(function (db) {
       return new Promise(function (res, rej) {
-        var q = fn(db.transaction("songs", mode).objectStore("songs"));
-        q.onsuccess = function () { res(q.result); };
-        q.onerror = function () { rej(q.error); };
+        var s = db.transaction("songs", mode).objectStore("songs");
+        var req = fn(s);
+        req.onsuccess = function () { res(req.result); };
+        req.onerror = function () { rej(req.error); };
       });
     });
   }
+
   function save(song) { return tx("readwrite", function (s) { return s.put(song); }).then(renderLib).catch(function () {}); }
   function renderLib() {
     return tx("readonly", function (s) { return s.getAll(); }).then(function (list) {
@@ -382,20 +510,21 @@ audio { width: 100%; }
       var box = $("#lib"); box.textContent = "";
       $("#libCard").hidden = !list.length;
       list.forEach(function (it) {
-        var load = h("button", { class: "btn small", type: "button", text: "فتح الكلمات" });
+        var load = h("button", { class: "btn btn-small", type: "button", text: "فتح" });
         load.addEventListener("click", function () {
           $("#title").value = it.title; $("#lyrics").value = it.lyrics; $("#style").value = it.style;
-          $("#lyricsCard").hidden = false; $("#lyricsCard").scrollIntoView({ behavior: "smooth" });
+          $("#lyricsCard").hidden = false; $("#lyricsCard").scrollIntoView({ behavior: "smooth", block: "start" });
         });
-        var del = h("button", { class: "btn small", type: "button", text: "حذف" });
-        del.addEventListener("click", function () { tx("readwrite", function (s) { return s.delete(it.id); }).then(renderLib).catch(function () {}); });
-        var item = h("div", { class: "lib-item" }, h("b", { text: it.title }));
-        playerFor(it.blob, it.title).forEach(function (n) { item.append(n); });
-        item.append(h("div", { class: "actions" }, load, del));
-        box.append(item);
+        var del = h("button", { class: "btn btn-small", type: "button", text: "حذف" });
+        del.addEventListener("click", function () { tx("readwrite", function (s) { return s.delete(it.id); }).then(renderLib); });
+        var row = h("div", { class: "lib-item" }, h("h3", { text: it.title }));
+        playerFor(it.blob, it.title).forEach(function (n) { row.appendChild(n); });
+        row.appendChild(h("div", { class: "actions" }, load, del));
+        box.appendChild(row);
       });
     }).catch(function () {});
   }
+
   renderLib();
 })();
 </script>
